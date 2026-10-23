@@ -1,0 +1,1989 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RO-SGL-7.4-FT-01 | Recepción de Detectores de Gases</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- ExcelJS CDN: escribe sobre la plantilla conservando estilos y fórmulas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+    <!-- jsPDF: dibuja el PDF directamente desde la hoja de Excel generada (formato exacto de la plantilla) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+        .cond-select {
+            font-size: 0.75rem;
+            min-width: 48px;
+            padding: 0.25rem 0.15rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+        }
+        .cond-OK { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+        .cond-NC { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+        .cond-RG { background-color: #fef3c7; color: #b45309; border: 1px solid #fde047; }
+        .cond-NT { background-color: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db; }
+        .cond-NA { background-color: #e5e7eb; color: #6b7280; border: 1px solid #9ca3af; }
+        .cell-flash { animation: flashHighlight 1.2s ease-out; }
+        @keyframes flashHighlight {
+            0% { background-color: #bbf7d0 !important; box-shadow: 0 0 0 2px #22c55e !important; }
+            50% { background-color: #dcfce7 !important; box-shadow: 0 0 0 2px #22c55e !important; }
+            100% { background-color: transparent; box-shadow: none; }
+        }
+
+        /* ---------- Responsive: tabla de ítems ----------
+           La tabla tiene 19 columnas; en celular no se puede mostrar entera
+           sin desplazamiento horizontal. Se fija un ancho mínimo y se deja
+           que el contenedor haga scroll-x, con la columna "Ítem" y el
+           encabezado fijos para no perder la referencia al desplazarse. */
+        .tabla-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+        }
+        .tabla-scroll table { min-width: 1150px; border: none; }
+        .tabla-scroll thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        /* Un elemento "sticky" debe traer su propio color de fondo: el que
+           pinta la fila (tr) no siempre se conserva al fijarlo. */
+        .tabla-scroll thead tr:nth-child(1) th { background-color: #1e293b; }
+        .tabla-scroll thead tr:nth-child(2) th { background-color: #334155; }
+        .tabla-scroll th:first-child,
+        .tabla-scroll td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 1;
+        }
+        .tabla-scroll thead th:first-child { z-index: 3; }
+        .tabla-scroll td:first-child { background-color: #f1f5f9; }
+
+        @media print {
+            .tabla-scroll { overflow: visible; border: none; }
+            .tabla-scroll table { min-width: 0; }
+            .tabla-scroll th:first-child,
+            .tabla-scroll td:first-child,
+            .tabla-scroll thead th { position: static; }
+        }
+
+        @media (max-width: 640px) {
+            input[type="text"], input[type="date"], input[type="time"],
+            textarea, select:not(.cond-select) {
+                font-size: 16px; /* evita el zoom automático de Safari/iOS al enfocar */
+            }
+        }
+
+        @media print {
+            @page {
+                size: landscape;
+                margin: 5mm;
+            }
+            body {
+                background-color: #fff;
+                color: #000;
+                font-size: 9pt;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+            }
+            .print-table th, .print-table td {
+                border: 1px solid #000 !important;
+                padding: 2px 4px !important;
+                font-size: 8pt !important;
+            }
+        }
+    </style>
+</head>
+<body class="p-3 md:p-6 text-slate-800">
+
+    <div class="max-w-[1550px] mx-auto bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+        
+        <!-- BARRA SUPERIOR DE ACCIONES -->
+        <div class="no-print bg-slate-900 text-white p-4 flex flex-wrap justify-between items-center gap-3 border-b border-slate-800">
+            <div class="flex items-center gap-3">
+                <div class="bg-amber-500 text-slate-950 p-2.5 rounded-lg font-bold">
+                    <i class="fa-solid fa-microchip text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">Sistema de Gestión de Laboratorio (SGL)</h1>
+                    <p class="text-xs text-slate-400">Recepción de Equipos Detectores de Gases Tóxicos / Explosivos | <span class="text-amber-400 font-mono">RO-SGL-7.4-FT-01</span></p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="nuevoFormulario()" class="bg-slate-700 hover:bg-slate-600 text-xs text-white px-3 py-2 rounded-lg transition flex items-center gap-1.5 font-medium">
+                    <i class="fa-solid fa-file-circle-plus"></i> Nuevo
+                </button>
+                <button onclick="guardarRecepcion()" id="btnGuardar" title="Guarda la recepción en la base de datos (Firebase)" class="bg-amber-500 hover:bg-amber-400 text-xs text-slate-950 px-3 py-2 rounded-lg transition flex items-center gap-1.5 font-semibold">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Guardar
+                </button>
+                <button onclick="abrirBuscador()" title="Buscar una recepción guardada por su número" class="bg-slate-700 hover:bg-slate-600 text-xs text-white px-3 py-2 rounded-lg transition flex items-center gap-1.5 font-medium">
+                    <i class="fa-solid fa-magnifying-glass text-sky-400"></i> Buscar
+                </button>
+                <!-- // Traer de COMERCIALES //
+			   <button onclick="cargarEjemplo()" class="bg-slate-700 hover:bg-slate-600 text-xs text-amber-300 px-3 py-2 rounded-lg transition flex items-center gap-1.5 font-medium">
+                    <i class="fa-solid fa-vial"></i> Cargar Datos Ejemplo
+                </button>
+				
+                <button onclick="seleccionarPlantilla()" title="La plantilla oficial ya viene incluida; use esto solo para probar otra distinta en esta sesión" class="bg-slate-700 hover:bg-slate-600 text-xs text-white px-3 py-2 rounded-lg transition flex items-center gap-1.5 font-medium">
+                    <i class="fa-solid fa-table-list text-emerald-400"></i> Cambiar Plantilla
+                </button>
+				-->
+                <input type="file" id="inputPlantilla" accept=".xlsx" class="hidden">
+                <button onclick="exportarExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-xs text-white px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 font-semibold shadow">
+                    <i class="fa-solid fa-file-excel"></i> Exportar Excel
+                </button>
+                <button onclick="exportarPDF()" class="bg-blue-600 hover:bg-blue-500 text-xs text-white px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 font-semibold shadow">
+                    <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+                </button>
+                <button onclick="imprimirPDF()" class="bg-slate-600 hover:bg-slate-500 text-xs text-white px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 font-semibold shadow">
+                    <i class="fa-solid fa-print"></i> Imprimir
+                </button>
+                <button onclick="imprimirEtiquetas()" title="Imprime las etiquetas de identificación (RO-SGL-7.4-ET-01) de los equipos de la recepción cargada" class="bg-orange-500 hover:bg-orange-400 text-xs text-white px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 font-semibold shadow">
+                    <i class="fa-solid fa-tags"></i> Imprimir Etiquetas
+                </button>
+            </div>
+        </div>
+
+        <!-- ENCABEZADO CONTROL DOCUMENTAL -->
+        <div class="p-4 border-b border-slate-200 bg-slate-50">
+            <div class="grid grid-cols-12 gap-2 text-center text-xs font-semibold border border-slate-300 rounded-lg bg-white overflow-hidden shadow-sm">
+                <div class="col-span-12 md:col-span-3 p-3 flex flex-col justify-center items-center border-b md:border-b-0 md:border-r border-slate-300 bg-slate-100">
+                    <span class="font-extrabold text-sm text-slate-800 tracking-wide">RENSER ORIENTE, C.A.</span>
+                    <span class="text-[10px] text-slate-500 uppercase tracking-wider">Laboratorio de Calibración</span>
+                </div>
+                <div class="col-span-12 md:col-span-6 p-3 flex flex-col justify-center items-center border-b md:border-b-0 md:border-r border-slate-300">
+                    <span class="text-slate-500 text-[10px] uppercase font-bold">Sistema de Gestión de Laboratorio</span>
+                    <span class="font-bold text-sm md:text-base text-slate-900 uppercase mt-0.5">Recepción de Equipos Detectores de Gases Tóxicos / Explosivos</span>
+                </div>
+                <div class="col-span-12 md:col-span-3 p-2 text-left bg-slate-50 flex flex-col justify-between text-[11px] space-y-1">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Código:</span>
+                        <span class="font-mono font-bold text-slate-800">RO-SGL-7.4-FT-01</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Revisión:</span>
+                        <span class="font-bold text-slate-800">00</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Vigencia:</span>
+                        <span class="font-bold text-slate-800">20-07-2026</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DATOS DE CABECERA Y METADATOS -->
+        <div class="p-4 bg-white border-b border-slate-200">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Nro. Recepción:</label>
+                    <input type="text" id="nroRecepcion" placeholder="ej. LB-2026-089" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono font-semibold text-slate-900">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Fecha:</label>
+                    <input type="date" id="fechaRecepcion" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Hora:</label>
+                    <input type="time" id="horaRecepcion" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Cliente:</label>
+                    <input type="text" id="cliente" placeholder="Nombre de la empresa o cliente" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block font-bold text-slate-700 mb-1">Orden de Servicio (Comerciales):</label>
+                    <input type="text" id="ordenServicio" placeholder="ej. OS-2026-0452 / Cotización N°..." class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Lugar del Servicio:</label>
+                    <div class="flex items-center gap-6 mt-2 bg-slate-50 p-2 rounded border border-slate-200">
+                        <label class="inline-flex items-center cursor-pointer font-medium text-slate-700">
+                            <input type="radio" name="lugarServicio" value="Lab" checked class="text-blue-600 focus:ring-blue-500">
+                            <span class="ml-1.5">Lab (Laboratorio)</span>
+                        </label>
+                        <label class="inline-flex items-center cursor-pointer font-medium text-slate-700">
+                            <input type="radio" name="lugarServicio" value="Insitu" class="text-blue-600 focus:ring-blue-500">
+                            <span class="ml-1.5">Insitu (Campo)</span>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Condiciones Ambientales:</label>
+                    <div class="grid grid-cols-3 gap-1">
+                        <input type="text" id="tempAmb" placeholder="Temp °C" class="p-1.5 border border-slate-300 rounded text-center text-xs">
+                        <input type="text" id="humAmb" placeholder="Hum %" class="p-1.5 border border-slate-300 rounded text-center text-xs">
+                        <input type="text" id="paAmb" placeholder="P.A. mbar" class="p-1.5 border border-slate-300 rounded text-center text-xs">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TABLA PRINCIPAL DE EQUIPOS -->
+        <div class="p-4">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
+                <h2 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-blue-600"></i> Inspección y Registro de Ítems
+                </h2>
+                <div class="no-print flex flex-wrap items-center gap-2">
+                    <!-- <button onclick="configurarTodosTipo('U')" class="text-xs bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 px-2.5 py-1.5 rounded font-semibold transition flex items-center gap-1" title="Configura todas las filas como Monogas (Tipo U, Componente H2S y condiciones por defecto)">
+                        <i class="fa-solid fa-1 text-amber-700"></i> Monogas (U)
+                    </button>
+                    <button onclick="configurarTodosTipo('M')" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 px-2.5 py-1.5 rounded font-semibold transition flex items-center gap-1" title="Configura todas las filas como Multigas (Tipo M, Componentes CO/H2S/CH4/O2 y condiciones por defecto)">
+                        <i class="fa-solid fa-layer-group text-blue-600"></i> Multigas (M)
+                    </button>
+                    <button onclick="aplicarCondicionesPorDefecto()" class="text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-2.5 py-1.5 rounded font-medium transition" title="Restablece: OK en Encendido/Batería/Pantalla/Carcaza/Alarmas/Filtros/Último Servicio, NA en Bomba/Conexión/Vibración y NT en Cargador/Kit">
+                        <i class="fa-solid fa-rotate-left text-blue-600"></i> Condiciones por defecto
+                    </button>
+                    <button onclick="aplicarTodosOK()" class="text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-2.5 py-1.5 rounded font-medium transition">
+                        <i class="fa-solid fa-check-double text-emerald-600"></i> Marcar todas las condiciones como OK
+                    </button>-->
+                    <button onclick="agregarFila()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-semibold transition flex items-center gap-1 shadow-sm">
+                        <i class="fa-solid fa-plus"></i> Agregar Fila
+                    </button>
+                </div>
+            </div>
+
+            <p class="no-print sm:hidden text-[10px] text-slate-400 mb-1.5 flex items-center gap-1">
+                <i class="fa-solid fa-arrows-left-right"></i> Desliza la tabla para ver todas las columnas
+            </p>
+
+            <div class="tabla-scroll">
+            <table class="w-full border-collapse border border-slate-300 text-[11px] print-table">
+                <thead>
+                    <tr class="bg-slate-800 text-white text-center">
+                        <th class="border border-slate-400 p-1.5 w-8" rowspan="2">Ítem</th>
+                        <th class="border border-slate-400 p-1.5" colspan="3">Identificación</th>
+                        <th class="border border-slate-400 p-1.5 w-16" rowspan="2">Tipo</th>
+                        <th class="border border-slate-400 p-1.5 min-w-[140px]" rowspan="2">Componentes</th>
+                        <th class="border border-slate-400 p-1.5" colspan="13">Estado y/o Condiciones Generales del Equipo</th>
+                        <th class="border border-slate-400 p-1.5 w-8 no-print" rowspan="2">Acción</th>
+                    </tr>
+                    <tr class="bg-slate-700 text-white text-[10px]">
+                        <th class="border border-slate-400 p-1 min-w-[90px]">Serial</th>
+                        <th class="border border-slate-400 p-1 min-w-[80px]">Marca</th>
+                        <th class="border border-slate-400 p-1 min-w-[80px]">Modelo</th>
+
+                        <!-- 13 Campos de Estado de la Imagen -->
+                        <th class="border border-slate-400 p-1" title="Encendido">Encendido</th>
+                        <th class="border border-slate-400 p-1" title="Batería / Alimentación">Batería/Alimentacion</th>
+                        <th class="border border-slate-400 p-1" title="Pantalla">Pantalla</th>
+                        <th class="border border-slate-400 p-1" title="Bomba">Bomba</th>
+                        <th class="border border-slate-400 p-1" title="Cargador">Cargador</th>
+                        <th class="border border-slate-400 p-1" title="Carcaza">Carcaza</th>
+                        <th class="border border-slate-400 p-1" title="Alarma Luz">Alarma Luz</th>
+                        <th class="border border-slate-400 p-1" title="Alarma Sonido">Alarma Sonido</th>
+                        <th class="border border-slate-400 p-1" title="Filtros">Filtros</th>
+                        <th class="border border-slate-400 p-1" title="Conexión a panel">Conexión a panel</th>
+                        <th class="border border-slate-400 p-1" title="Kit de Calibración">Kit de Calibración</th>
+                        <th class="border border-slate-400 p-1" title="Último Servicio">Último Servicio</th>
+                        <th class="border border-slate-400 p-1" title="Vibración y/o sacudidas">Vibración y/o sacudidas</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaBody">
+                    <!-- Filas dinámicas generadas mediante JavaScript -->
+                </tbody>
+            </table>
+            </div>
+        </div>
+
+        <!-- LEYENDAS Y CONVENCIONES -->
+        <div class="px-4 py-2 bg-slate-50 border-t border-b border-slate-200 text-[10px] text-slate-600 flex flex-wrap justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-1">
+                <span class="font-bold text-slate-800">Tipo:</span> 
+                <button type="button" onclick="configurarTodosTipo('U')" class="px-1.5 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-semibold transition cursor-pointer" title="Pulsar para configurar todas las filas como Monogas (U)"><span class="font-bold">U</span> (Monogas)</button> | 
+                <button type="button" onclick="configurarTodosTipo('M')" class="px-1.5 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-semibold transition cursor-pointer" title="Pulsar para configurar todas las filas como Multigas (M)"><span class="font-bold">M</span> (Multigas)</button> | 
+                <span class="font-semibold text-slate-700">F</span> (Fijo) | 
+                <span class="font-semibold text-slate-700">O</span> (Otro)
+            </div>
+            <div>
+                <span class="font-bold text-slate-800">Estado o Condición:</span> 
+                <span class="px-1 bg-green-100 text-green-800 font-bold rounded">OK</span> (Conforme) | 
+                <span class="px-1 bg-red-100 text-red-800 font-bold rounded">NC</span> (No Conforme) | 
+                <span class="px-1 bg-yellow-100 text-yellow-800 font-bold rounded">RG</span> (Regular) | 
+                <span class="px-1 bg-gray-100 text-gray-800 font-bold rounded">NT</span> (No tiene) | 
+                <span class="px-1 bg-gray-200 text-gray-700 font-bold rounded">NA</span> (No Aplica)
+            </div>
+        </div>
+
+        <!-- OBSERVACIONES -->
+        <div class="p-4 bg-white border-b border-slate-200">
+            <label class="block font-bold text-xs text-slate-700 mb-1">Observaciones:</label>
+            <textarea id="observaciones" rows="3" placeholder="Indique rayaduras, estado de sensores, faltantes o particularidades observadas..." class="w-full p-2.5 border border-slate-300 rounded text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+        </div>
+
+        <!-- FIRMAS Y RESPONSABLES -->
+        <div class="p-4 bg-slate-50">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                <div class="border border-slate-300 bg-white p-3 rounded-lg shadow-sm">
+                    <div class="font-bold text-slate-800 border-b border-slate-200 pb-1 mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-user-check text-slate-600"></i> Entregado por:
+                    </div>
+                    <div class="space-y-2">
+                        <div>
+                            <label class="text-[10px] text-slate-500 font-semibold block mb-1">Nombre y Apellido:</label>
+                            <input type="text" id="entregadoNombre" data-k="entregadoNombre" oninput="actualizarBotonesEquipo()" placeholder="Nombre completo" class="w-full p-1.5 border border-slate-300 rounded text-xs">
+                            <div class="no-print flex flex-wrap gap-1.5 mt-1.5">
+                                <button type="button" id="btnEntregado1" data-target="entregadoNombre" data-nombre="Javier Bermudez" onclick="fijarParametroEquipo('entregadoNombre', 'Javier Bermudez')" class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold border border-slate-300 bg-slate-100 text-slate-700 hover:bg-blue-50 hover:border-blue-400 transition-colors" title="Asignar entregado por: Javier Bermudez">Javier Bermudez</button>
+                                <button type="button" id="btnEntregado2" data-target="entregadoNombre" data-nombre="Elian Martinez" onclick="fijarParametroEquipo('entregadoNombre', 'Elian Martinez')" class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold border border-slate-300 bg-slate-100 text-slate-700 hover:bg-blue-50 hover:border-blue-400 transition-colors" title="Asignar entregado por: Elian Martinez">Elian Martinez</button>
+                                <button type="button" id="btnEntregado3" data-target="entregadoNombre" data-nombre="Miguel Quiñones" onclick="fijarParametroEquipo('entregadoNombre', 'Miguel Quiñones')" class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold border border-slate-300 bg-slate-100 text-slate-700 hover:bg-blue-50 hover:border-blue-400 transition-colors" title="Asignar entregado por: Miguel Quiñones">Miguel Quiñones</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] text-slate-500 font-semibold block">C.I. / Pasaporte:</label>
+                                <input type="text" id="entregadoCI" placeholder="ej. V-12.345.678" class="w-full p-1.5 border border-slate-300 rounded text-xs">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-500 font-semibold block">Empresa / Cargo:</label>
+                                <input type="text" id="entregadoCargo" placeholder="ej. Inspector HSE" class="w-full p-1.5 border border-slate-300 rounded text-xs">
+                            </div>
+                        </div>
+                        <div class="pt-6 border-t border-dashed border-slate-300 text-center text-slate-400 text-[10px]">
+                            Firma de Entregado
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border border-slate-300 bg-white p-3 rounded-lg shadow-sm">
+                    <div class="font-bold text-slate-800 border-b border-slate-200 pb-1 mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-user-gear text-blue-600"></i> Recibido por:
+                    </div>
+                    <div class="space-y-2">
+                        <div>
+                            <label class="text-[10px] text-slate-500 font-semibold block mb-1">Nombre y Apellido:</label>
+                            <input type="text" id="recibidoNombre" data-k="recibidoNombre" oninput="actualizarBotonesEquipo()" placeholder="Nombre completo" class="w-full p-1.5 border border-slate-300 rounded text-xs">
+                            <div class="no-print flex flex-wrap gap-1.5 mt-1.5">
+                                <button type="button" id="btnRecibido1" data-target="recibidoNombre" data-nombre="Javier Bermudez" onclick="fijarParametroEquipo('recibidoNombre', 'Javier Bermudez')" class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold border border-slate-300 bg-slate-100 text-slate-700 hover:bg-blue-50 hover:border-blue-400 transition-colors" title="Asignar recibido por: Javier Bermudez">Javier Bermudez</button>
+                                <button type="button" id="btnRecibido2" data-target="recibidoNombre" data-nombre="Elian Martinez" onclick="fijarParametroEquipo('recibidoNombre', 'Elian Martinez')" class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold border border-slate-300 bg-slate-100 text-slate-700 hover:bg-blue-50 hover:border-blue-400 transition-colors" title="Asignar recibido por: Elian Martinez">Elian Martinez</button>
+                                <button type="button" id="btnRecibido3" data-target="recibidoNombre" data-nombre="Miguel Quiñones" onclick="fijarParametroEquipo('recibidoNombre', 'Miguel Quiñones')" class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold border border-slate-300 bg-slate-100 text-slate-700 hover:bg-blue-50 hover:border-blue-400 transition-colors" title="Asignar recibido por: Miguel Quiñones">Miguel Quiñones</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] text-slate-500 font-semibold block">C.I. / Pasaporte:</label>
+                                <input type="text" id="recibidoCI" placeholder="ej. V-18.765.432" class="w-full p-1.5 border border-slate-300 rounded text-xs">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-500 font-semibold block">Cargo / Departamento:</label>
+                                <input type="text" id="recibidoCargo" placeholder="Técnico de Laboratorio / SGL" class="w-full p-1.5 border border-slate-300 rounded text-xs">
+                            </div>
+                        </div>
+                        <div class="pt-6 border-t border-dashed border-slate-300 text-center text-slate-400 text-[10px]">
+                            Firma de Recibido y Sello
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODAL DE BÚSQUEDA (Firebase) -->
+    <div id="modalBuscar" class="no-print hidden fixed inset-0 z-50 bg-slate-900/60 flex items-start justify-center p-3 pt-16" onclick="if(event.target===this)cerrarBuscador()">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl border border-slate-200">
+            <div class="flex items-center justify-between p-3 border-b border-slate-200">
+                <h3 class="font-bold text-sm text-slate-800 flex items-center gap-2"><i class="fa-solid fa-magnifying-glass text-sky-600"></i> Buscar recepción guardada</h3>
+                <button onclick="cerrarBuscador()" class="text-slate-400 hover:text-slate-700 px-2"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form class="p-3 flex gap-2" onsubmit="event.preventDefault(); ejecutarBusqueda();">
+                <input type="text" id="buscarNro" placeholder="Nro. de recepción (ej. LB-2026-0042 o LB-2026). Vacío = las más recientes" class="flex-1 p-2 border border-slate-300 rounded text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none" style="font-size:16px">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 rounded">Buscar</button>
+            </form>
+            <div id="resultadosBusqueda" class="px-3 pb-3 max-h-[60vh] overflow-y-auto text-xs"></div>
+        </div>
+    </div>
+    <div id="toast" class="no-print hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-lg shadow-lg text-xs font-semibold text-white max-w-[90vw]"></div>
+
+    <!-- MODAL DE CONFIRMACIÓN EN PÁGINA -->
+    <div id="modalDialogo" class="no-print hidden fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden">
+            <div class="p-4 border-b border-slate-200 flex items-center gap-2.5 bg-slate-50">
+                <i class="fa-solid fa-circle-question text-amber-500 text-lg"></i>
+                <h3 id="dlgTitulo" class="font-bold text-sm text-slate-900">Confirmación</h3>
+            </div>
+            <div class="p-4 space-y-3 text-xs">
+                <p id="dlgMensaje" class="text-slate-700 whitespace-pre-line leading-relaxed"></p>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" id="dlgBtnCancelar" class="px-3.5 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold">Cancelar</button>
+                    <button type="button" id="dlgBtnAceptar" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-xs">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT DE LÓGICA -->
+    <script>
+        const CONDICIONES_CAMPOS = [
+            'encendido', 'bateria', 'pantalla', 'bomba', 'cargador', 'carcaza', 
+            'alarmaLuz', 'alarmaSonido', 'filtros', 'conexionPanel', 'kitCalibracion', 
+            'ultimoServicio', 'vibracion'
+        ];
+
+        const CONDICIONES_POR_DEFECTO = {
+            encendido: 'OK',
+            bateria: 'OK',
+            pantalla: 'OK',
+            bomba: 'NA',
+            cargador: 'NT',
+            carcaza: 'OK',
+            alarmaLuz: 'OK',
+            alarmaSonido: 'OK',
+            filtros: 'OK',
+            conexionPanel: 'NA',
+            kitCalibracion: 'NT',
+            ultimoServicio: 'OK',
+            vibracion: 'NA'
+        };
+
+        const COMPONENTES_LISTA = ['CO', 'H2S', 'CH4', 'O2', 'NH3', 'SO2', 'CO2', 'Otros'];
+
+        let itemsData = [];
+
+        /* ---------- Fecha y hora del dispositivo ----------
+           Se calculan con los componentes locales (getFullYear/getMonth/getDate),
+           no con toISOString(), que usa UTC y adelantaba un día en Venezuela
+           (UTC-4) a partir de las 20:00. Se refrescan solas mientras el usuario
+           no las edite a mano. */
+        let fechaHoraEditada = false;
+
+        const dosDigitos = n => String(n).padStart(2, '0');
+
+        const $ = sel => document.querySelector(sel);
+        const $$ = sel => [...document.querySelectorAll(sel)];
+
+        let resolverDialogo = null;
+        function confirmarModal(mensaje, titulo = 'Confirmar acción') {
+            return new Promise(resolve => {
+                resolverDialogo = resolve;
+                document.getElementById('dlgTitulo').textContent = titulo;
+                document.getElementById('dlgMensaje').textContent = mensaje;
+                document.getElementById('modalDialogo').classList.remove('hidden');
+                setTimeout(() => document.getElementById('dlgBtnAceptar').focus(), 30);
+            });
+        }
+        function cerrarDialogo(resultado) {
+            document.getElementById('modalDialogo').classList.add('hidden');
+            if (resolverDialogo) {
+                const fn = resolverDialogo;
+                resolverDialogo = null;
+                fn(resultado === true);
+            }
+        }
+        document.getElementById('dlgBtnCancelar').addEventListener('click', () => cerrarDialogo(false));
+        document.getElementById('dlgBtnAceptar').addEventListener('click', () => cerrarDialogo(true));
+
+        function destellarElemento(el) {
+            if (!el) return;
+            el.classList.remove('cell-flash');
+            void el.offsetWidth;
+            el.classList.add('cell-flash');
+            setTimeout(() => el.classList.remove('cell-flash'), 1250);
+        }
+
+        const normalizarTextoNombre = s => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+        function actualizarBotonesEquipo() {
+            const clsActivo = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold border border-blue-600 bg-blue-600 text-white shadow-2xs transition-colors';
+            const clsInactivo = 'px-2 py-0.5 rounded text-[10px] font-mono font-semibold border border-slate-300 bg-slate-100 text-slate-700 hover:bg-blue-50 hover:border-blue-400 transition-colors';
+            $$('button[data-target][data-nombre]').forEach(btn => {
+                const inputEl = document.getElementById(btn.dataset.target);
+                const valActual = normalizarTextoNombre(inputEl ? inputEl.value : '');
+                const valBoton = normalizarTextoNombre(btn.dataset.nombre);
+                btn.className = (valActual && valActual === valBoton) ? clsActivo : clsInactivo;
+            });
+        }
+
+        function fijarParametroEquipo(k, nuevoValor) {
+            const idMap = {
+                'Nombre completo': 'entregadoNombre',
+                'entregadoNombre': 'entregadoNombre',
+                'recibidoNombre': 'recibidoNombre'
+            };
+            const targetId = idMap[k] || k;
+            const el = document.getElementById(targetId) || $(`[data-k="${k}"]`);
+            if (!el) return;
+            const ant = (el.dataset.original ?? el.value ?? '').trim();
+            const nue = String(nuevoValor ?? '').trim();
+            el.value = nue;
+            el.dataset.original = nue;
+            actualizarBotonesEquipo();
+            destellarElemento(el);
+            if (ant !== nue) {
+                const etq = targetId === 'entregadoNombre' ? 'Entregado por' : (targetId === 'recibidoNombre' ? 'Recibido por' : k);
+                avisar(`${etq}: ${nue}`);
+            }
+        }
+
+        function fechaLocalISO(d = new Date()) {
+            return `${d.getFullYear()}-${dosDigitos(d.getMonth() + 1)}-${dosDigitos(d.getDate())}`;
+        }
+
+        function horaLocal(d = new Date()) {
+            return `${dosDigitos(d.getHours())}:${dosDigitos(d.getMinutes())}`;
+        }
+
+        function sincronizarFechaHora(forzar = false) {
+            if (fechaHoraEditada && !forzar) return;
+            const ahora = new Date();
+            document.getElementById('fechaRecepcion').value = fechaLocalISO(ahora);
+            document.getElementById('horaRecepcion').value  = horaLocal(ahora);
+        }
+
+        /* ---------- Nro. de Recepción correlativo ----------
+           Se guarda en este navegador (localStorage) el último número usado
+           por año. Al abrir el formulario o pulsar "Nuevo" se PROPONE el
+           siguiente número (el campo sigue siendo editable a mano); el
+           correlativo solo se consolida —incrementa de verdad— cuando el
+           informe se exporta a Excel, para no "quemar" números de intentos
+           que el usuario no llegó a generar. Si el usuario escribe un número
+           distinto, el próximo informe continúa a partir de ese valor. */
+        const CORRELATIVO_KEY   = 'RO_SGL_7_4_correlativo_compartido';   // contador único Gases + Presión
+        const CORRELATIVO_KEYS_ANTERIORES = ['RO_SGL_7_4_FT_01_correlativo', 'RO_SGL_7_4_FT_02_correlativo'];
+        const NODOS_CORRELATIVO = [['recepciones', 'LB'], ['recepciones_presion', 'LB'], ['recepciones_presion', 'PRES']];   // PRES = recepciones de presión guardadas antes del cambio
+        const PREFIJO_CORRELATIVO = 'LB';
+
+        function leerCorrelativo() {
+            // Contador COMPARTIDO por Gases y Presión: se toma el mayor (año, número) guardado
+            // en este navegador, incluidos los contadores individuales de versiones anteriores.
+            let mejor = null;
+            [CORRELATIVO_KEY, ...CORRELATIVO_KEYS_ANTERIORES].forEach(k => {
+                try {
+                    const raw = localStorage.getItem(k);
+                    if (!raw) return;
+                    const c = JSON.parse(raw);
+                    if (c && (!mejor || c.anio > mejor.anio || (c.anio === mejor.anio && c.numero > mejor.numero))) mejor = c;
+                } catch { /* valor corrupto: se ignora */ }
+            });
+            return mejor;
+        }
+
+        /** Número propuesto actualmente en el campo (si el usuario no lo toca, se mantiene al día). */
+        let nroPropuesto = '';
+        function aplicarPropuesta() {
+            nroPropuesto = proponerCorrelativo();
+            document.getElementById('nroRecepcion').value = nroPropuesto;
+        }
+
+        function guardarCorrelativo(anio, numero) {
+            try { localStorage.setItem(CORRELATIVO_KEY, JSON.stringify({ anio, numero })); }
+            catch { /* localStorage no disponible (modo privado, etc.) */ }
+        }
+
+        function formatearCorrelativo(anio, numero) {
+            return `${PREFIJO_CORRELATIVO}-${anio}-${String(numero).padStart(4, '0')}`;
+        }
+
+        /** Siguiente número disponible, sin consumirlo todavía. */
+        function proponerCorrelativo() {
+            const anioActual = new Date().getFullYear();
+            const guardado   = leerCorrelativo();
+            const numero     = (guardado && guardado.anio === anioActual) ? guardado.numero + 1 : 1;
+            return formatearCorrelativo(anioActual, numero);
+        }
+
+        /** Registra como "usado" el número que quedó en el campo, si sigue el
+            patrón REC-AAAA-NNNN, para que el próximo informe continúe desde
+            ahí. Se llama al exportar, que es cuando el informe queda generado. */
+        function confirmarCorrelativoUsado() {
+            const m = val('nroRecepcion').trim().toUpperCase().match(/^(?:LB|PRES)-(\d{4})-(\d+)$/);
+            if (!m) return;
+            const anio = Number(m[1]), numero = Number(m[2]);
+            const guardado = leerCorrelativo();
+            if (!guardado || guardado.anio !== anio || numero > guardado.numero) {
+                guardarCorrelativo(anio, numero);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            sincronizarFechaHora(true);
+            aplicarPropuesta();
+
+            // Si el usuario escribe su propia fecha u hora, deja de sincronizarse.
+            ['fechaRecepcion', 'horaRecepcion'].forEach(id => {
+                document.getElementById(id).addEventListener('input', () => {
+                    fechaHoraEditada = true;
+                });
+            });
+
+            // Mantiene el valor al día si el formulario queda abierto o el
+            // dispositivo se suspende y se retoma.
+            setInterval(() => sincronizarFechaHora(), 30000);
+            window.addEventListener('focus', () => sincronizarFechaHora());
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) sincronizarFechaHora();
+            });
+
+            for (let i = 1; i <= 4; i++) {
+                crearNuevaFilaData(i);
+            }
+            renderTabla();
+        });
+
+        function crearNuevaFilaData(numItem) {
+            let rowObj = {
+                item: numItem,
+                serial: '',
+                marca: '',
+                modelo: '',
+                tipo: 'M',
+                componentes: ['CO', 'H2S', 'CH4', 'O2'],
+                condiciones: {}
+            };
+            CONDICIONES_CAMPOS.forEach(campo => {
+                rowObj.condiciones[campo] = CONDICIONES_POR_DEFECTO[campo] || 'OK';
+            });
+            itemsData.push(rowObj);
+        }
+
+        function agregarFila() {
+            let nuevoNum = itemsData.length + 1;
+            crearNuevaFilaData(nuevoNum);
+            renderTabla();
+        }
+
+        function eliminarFila(index) {
+            if (itemsData.length <= 1) {
+                avisar('Debe conservar al menos un ítem.', 'error');
+                return;
+            }
+            itemsData.splice(index, 1);
+            itemsData.forEach((item, idx) => item.item = idx + 1);
+            renderTabla();
+        }
+
+        function renderTabla() {
+            const tbody = document.getElementById('tablaBody');
+            tbody.innerHTML = '';
+
+            itemsData.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition border-b border-slate-200';
+
+                let compHtml = '<div class="grid grid-cols-2 gap-x-1 gap-y-0.5 text-[9px] font-medium">';
+                COMPONENTES_LISTA.forEach(comp => {
+                    let checked = row.componentes.includes(comp) ? 'checked' : '';
+                    compHtml += `
+                        <label class="inline-flex items-center gap-0.5 cursor-pointer">
+                            <input type="checkbox" ${checked} onchange="toggleComponente(${index}, '${comp}', this.checked)" class="rounded text-blue-600 focus:ring-0">
+                            <span>${comp}</span>
+                        </label>
+                    `;
+                });
+                compHtml += '</div>';
+
+                let condsHtml = '';
+                CONDICIONES_CAMPOS.forEach(campo => {
+                    let val = row.condiciones[campo] || CONDICIONES_POR_DEFECTO[campo] || 'OK';
+                    condsHtml += `
+                        <td class="p-1 border border-slate-300 text-center">
+                            <select onchange="actualizarCondicion(${index}, '${campo}', this.value)" class="cond-select cond-${val} w-full focus:outline-none">
+                                <option value="OK" ${val === 'OK' ? 'selected' : ''}>OK</option>
+                                <option value="NC" ${val === 'NC' ? 'selected' : ''}>NC</option>
+                                <option value="RG" ${val === 'RG' ? 'selected' : ''}>RG</option>
+                                <option value="NT" ${val === 'NT' ? 'selected' : ''}>NT</option>
+                                <option value="NA" ${val === 'NA' ? 'selected' : ''}>NA</option>
+                            </select>
+                        </td>
+                    `;
+                });
+
+                tr.innerHTML = `
+                    <td class="p-1.5 border border-slate-300 text-center font-bold text-slate-700 bg-slate-100">${row.item}</td>
+                    <td class="p-1 border border-slate-300">
+                        <input type="text" value="${escapeHtml(row.serial)}" onchange="actualizarCampo(${index}, 'serial', this.value)" placeholder="Serial #" class="w-full p-1 border border-slate-200 rounded font-mono text-[11px]">
+                    </td>
+                    <td class="p-1 border border-slate-300">
+                        <input type="text" value="${escapeHtml(row.marca)}" onchange="actualizarCampo(${index}, 'marca', this.value)" placeholder="ej. Honeywell" class="w-full p-1 border border-slate-200 rounded text-[11px]">
+                    </td>
+                    <td class="p-1 border border-slate-300">
+                        <input type="text" value="${escapeHtml(row.modelo)}" onchange="actualizarCampo(${index}, 'modelo', this.value)" placeholder="ej. BW Max XT II" class="w-full p-1 border border-slate-200 rounded text-[11px]">
+                    </td>
+                    <td class="p-1 border border-slate-300 text-center">
+                        <select onchange="actualizarCampo(${index}, 'tipo', this.value)" class="w-full p-1 border border-slate-200 rounded font-bold text-center">
+                            <option value="U" ${row.tipo === 'U' ? 'selected' : ''}>U</option>
+                            <option value="M" ${row.tipo === 'M' ? 'selected' : ''}>M</option>
+                            <option value="F" ${row.tipo === 'F' ? 'selected' : ''}>F</option>
+                            <option value="O" ${row.tipo === 'O' ? 'selected' : ''}>O</option>
+                        </select>
+                    </td>
+                    <td class="p-1.5 border border-slate-300 bg-slate-50">${compHtml}</td>
+                    ${condsHtml}
+                    <td class="p-1 border border-slate-300 text-center no-print">
+                        <button onclick="eliminarFila(${index})" title="Eliminar Ítem" class="text-red-500 hover:text-red-700 p-1">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/"/g, '&quot;');
+        }
+
+        function aplicarConfiguracionTipoEnFila(row, tipo) {
+            row.tipo = tipo;
+            if (tipo === 'U') {
+                row.componentes = ['H2S'];
+                CONDICIONES_CAMPOS.forEach(campo => {
+                    row.condiciones[campo] = CONDICIONES_POR_DEFECTO[campo] || 'OK';
+                });
+            } else if (tipo === 'M') {
+                row.componentes = ['CO', 'H2S', 'CH4', 'O2'];
+                CONDICIONES_CAMPOS.forEach(campo => {
+                    row.condiciones[campo] = CONDICIONES_POR_DEFECTO[campo] || 'OK';
+                });
+            }
+        }
+
+        function configurarTodosTipo(tipo) {
+            itemsData.forEach(row => aplicarConfiguracionTipoEnFila(row, tipo));
+            renderTabla();
+            avisar(tipo === 'U'
+                ? 'Todas las filas actualizadas a Monogas (Tipo U, H2S y condiciones por defecto).'
+                : 'Todas las filas actualizadas a Multigas (Tipo M, CO/H2S/CH4/O2 y condiciones por defecto).');
+        }
+
+        function actualizarCampo(index, field, value) {
+            itemsData[index][field] = value;
+            if (field === 'tipo' && (value === 'U' || value === 'M')) {
+                aplicarConfiguracionTipoEnFila(itemsData[index], value);
+                renderTabla();
+            }
+        }
+
+        function toggleComponente(index, comp, checked) {
+            let list = itemsData[index].componentes;
+            if (checked && !list.includes(comp)) {
+                list.push(comp);
+            } else if (!checked && list.includes(comp)) {
+                itemsData[index].componentes = list.filter(c => c !== comp);
+            }
+        }
+
+        function actualizarCondicion(index, campo, value) {
+            itemsData[index].condiciones[campo] = value;
+            renderTabla();
+        }
+
+        function aplicarCondicionesPorDefecto() {
+            itemsData.forEach(row => {
+                CONDICIONES_CAMPOS.forEach(campo => {
+                    row.condiciones[campo] = CONDICIONES_POR_DEFECTO[campo] || 'OK';
+                });
+            });
+            renderTabla();
+        }
+
+        function aplicarTodosOK() {
+            itemsData.forEach(row => {
+                CONDICIONES_CAMPOS.forEach(campo => {
+                    row.condiciones[campo] = 'OK';
+                });
+            });
+            renderTabla();
+        }
+
+        async function nuevoFormulario() {
+            if (await confirmarModal('¿Desea limpiar el formulario actual?', 'Nuevo Formulario')) {
+                itemsData = [];
+                for (let i = 1; i <= 4; i++) {
+                    crearNuevaFilaData(i);
+                }
+                ['nroRecepcion', 'cliente', 'ordenServicio', 'observaciones', 'tempAmb', 'humAmb', 'paAmb',
+                 'entregadoNombre', 'entregadoCI', 'entregadoCargo', 'recibidoNombre', 'recibidoCI', 'recibidoCargo'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) { el.value = ''; el.dataset.original = ''; }
+                });
+                actualizarBotonesEquipo();
+                aplicarPropuesta();
+                fechaHoraEditada = false;
+                sincronizarFechaHora(true);
+                recepcionCargada = null;
+                sincronizarCorrelativoRemoto();
+                renderTabla();
+                avisar('Formulario limpiado.');
+            }
+        }
+
+        /* =====================================================================
+           FIREBASE REALTIME DATABASE (API REST, sin SDK)
+           ---------------------------------------------------------------------
+           Cada recepción se guarda en  /recepciones/<NRO_RECEPCION>  (el número
+           en mayúsculas es la clave, así que buscar por número es directo).
+           Guardar con un número ya existente actualiza ese registro.
+           Requiere que las reglas de la base permitan leer y escribir en
+           "recepciones" (ver notas de seguridad al entregar el archivo).
+           ===================================================================== */
+        const FIREBASE_DB_URL = 'https://laboratorio-64b0f-default-rtdb.firebaseio.com';
+        const FIREBASE_NODO   = 'recepciones';
+        const FORM_CODIGO     = 'RO-SGL-7.4-FT-01';
+
+        let recepcionCargada = null;   // clave de la recepción traída de Firebase (para no pedir confirmación al re-guardarla)
+
+        function claveRecepcion(nro) {
+            return String(nro || '').trim().toUpperCase().replace(/[.$#\[\]\/\s]+/g, '_');
+        }
+
+        async function fbRequest(ruta, { metodo = 'GET', cuerpo = null, params = '' } = {}) {
+            const opciones = { method: metodo };
+            if (cuerpo !== null) {
+                opciones.headers = { 'Content-Type': 'application/json' };
+                opciones.body = JSON.stringify(cuerpo);
+            }
+            const endpoint = 'https://laboratorio-64b0f-default-rtdb.firebaseio.com/' + ruta + '.json' + params;
+            const res = await fetch(endpoint, opciones);
+            if (!res.ok) {
+                let msg = '';
+                try { msg = (await res.json()).error || ''; } catch { /* sin cuerpo JSON */ }
+                if (res.status === 401 || res.status === 403) {
+                    throw new Error('Firebase rechazó el acceso (' + (msg || res.status) + '). Revise las reglas de la base de datos.');
+                }
+                throw new Error(msg || ('Error HTTP ' + res.status));
+            }
+            return res.json();
+        }
+
+        let toastTimer = null;
+        function avisar(mensaje, tipo = 'ok') {
+            const t = document.getElementById('toast');
+            t.textContent = mensaje;
+            t.className = 'no-print fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-lg shadow-lg text-xs font-semibold text-white max-w-[90vw] '
+                        + (tipo === 'error' ? 'bg-red-600' : 'bg-emerald-600');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => t.classList.add('hidden'), tipo === 'error' ? 7000 : 3500);
+        }
+
+        function recolectarDatos() {
+            return {
+                formulario: FORM_CODIGO,
+                nroRecepcion: val('nroRecepcion'),
+                fechaRecepcion: document.getElementById('fechaRecepcion').value,
+                horaRecepcion: document.getElementById('horaRecepcion').value,
+                cliente: val('cliente'),
+                ordenServicio: val('ordenServicio'),
+                lugarServicio: document.querySelector('input[name="lugarServicio"]:checked')?.value || 'Lab',
+                tempAmb: val('tempAmb'),
+                humAmb: val('humAmb'),
+                paAmb: val('paAmb'),
+                observaciones: document.getElementById('observaciones').value,
+                entregadoNombre: val('entregadoNombre'),
+                entregadoCI: val('entregadoCI'),
+                entregadoCargo: val('entregadoCargo'),
+                recibidoNombre: val('recibidoNombre'),
+                recibidoCI: val('recibidoCI'),
+                recibidoCargo: val('recibidoCargo'),
+                itemsData: itemsData
+            };
+        }
+
+        async function guardarRecepcion() {
+            const nro = val('nroRecepcion');
+            if (!nro) { avisar('Escriba el Nro. de Recepción antes de guardar.', 'error'); return; }
+            const clave = claveRecepcion(nro);
+            const btn = document.getElementById('btnGuardar');
+            const textoBtn = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando…';
+            try {
+                const existente = await fbRequest(`${FIREBASE_NODO}/${clave}`);
+                if (existente && clave !== recepcionCargada &&
+                    !(await confirmarModal(`Ya existe una recepción guardada con el número ${nro}.\n¿Desea sobrescribirla?`, 'Recepción existente'))) {
+                    return;
+                }
+                const datos = recolectarDatos();
+                datos.guardadoEn = new Date().toISOString();
+                await fbRequest(`${FIREBASE_NODO}/${clave}`, { metodo: 'PUT', cuerpo: datos });
+                recepcionCargada = clave;
+                confirmarCorrelativoUsado();   // lo guardado cuenta como número usado
+                try { localStorage.setItem('RO_SGL_7_4_FT_01_borrador', JSON.stringify(datos)); } catch { /* opcional */ }
+                avisar(`Recepción ${nro} guardada en la base de datos.`);
+            } catch (e) {
+                avisar('No se pudo guardar: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = textoBtn;
+            }
+        }
+
+        /* ---------- Buscar y cargar ---------- */
+        function abrirBuscador() {
+            document.getElementById('modalBuscar').classList.remove('hidden');
+            const inp = document.getElementById('buscarNro');
+            inp.value = '';
+            inp.focus();
+            ejecutarBusqueda();
+        }
+
+        function cerrarBuscador() {
+            document.getElementById('modalBuscar').classList.add('hidden');
+        }
+
+        async function ejecutarBusqueda() {
+            const cont = document.getElementById('resultadosBusqueda');
+            const termino = claveRecepcion(document.getElementById('buscarNro').value);
+            cont.innerHTML = '<p class="text-slate-500 p-2"><i class="fa-solid fa-spinner fa-spin"></i> Buscando…</p>';
+            const enc = s => encodeURIComponent(s);
+            let params = `?orderBy=${enc('"$key"')}`;
+            params += termino
+                ? `&startAt=${enc(JSON.stringify(termino))}&endAt=${enc(JSON.stringify(termino + '\uf8ff'))}&limitToFirst=30`
+                : '&limitToLast=20';
+            try {
+                const datos = await fbRequest(FIREBASE_NODO, { params });
+                const claves = Object.keys(datos || {}).sort();
+                if (!termino) claves.reverse();            // más recientes primero
+                cont.innerHTML = '';
+                if (!claves.length) {
+                    cont.innerHTML = '<p class="text-slate-500 p-2">No se encontraron recepciones.</p>';
+                    return;
+                }
+                claves.forEach(clave => {
+                    const d = datos[clave] || {};
+                    const nItems = Array.isArray(d.itemsData) ? d.itemsData.length : Object.keys(d.itemsData || {}).length;
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'w-full text-left p-2 mb-1 border border-slate-200 rounded hover:bg-blue-50 hover:border-blue-300 transition';
+                    const l1 = document.createElement('div');
+                    l1.className = 'font-mono font-bold text-slate-800';
+                    l1.textContent = d.nroRecepcion || clave;
+                    const l2 = document.createElement('div');
+                    l2.className = 'text-slate-500';
+                    l2.textContent = [d.cliente || 'Sin cliente', d.fechaRecepcion ? fechaTexto(d.fechaRecepcion) : '', nItems + ' ítem(s)']
+                        .filter(Boolean).join('  ·  ');
+                    b.append(l1, l2);
+                    b.addEventListener('click', () => cargarRecepcion(clave));
+                    cont.appendChild(b);
+                });
+            } catch (e) {
+                cont.innerHTML = '';
+                const p = document.createElement('p');
+                p.className = 'text-red-600 p-2';
+                p.textContent = 'Error en la búsqueda: ' + e.message;
+                cont.appendChild(p);
+            }
+        }
+
+        async function cargarRecepcion(clave) {
+            try {
+                const d = await fbRequest(`${FIREBASE_NODO}/${clave}`);
+                if (!d) { avisar('La recepción ya no existe.', 'error'); return; }
+                aplicarDatosAlFormulario(d);
+                recepcionCargada = clave;
+                cerrarBuscador();
+                avisar(`Recepción ${d.nroRecepcion || clave} cargada.`);
+            } catch (e) {
+                avisar('No se pudo cargar: ' + e.message, 'error');
+            }
+        }
+
+        function aplicarDatosAlFormulario(d) {
+            const set = (id, v) => { document.getElementById(id).value = v ?? ''; };
+            set('nroRecepcion', d.nroRecepcion);
+            set('fechaRecepcion', d.fechaRecepcion);
+            set('horaRecepcion', d.horaRecepcion);
+            set('cliente', d.cliente);
+            set('ordenServicio', d.ordenServicio);
+            set('tempAmb', d.tempAmb);
+            set('humAmb', d.humAmb);
+            set('paAmb', d.paAmb);
+            set('observaciones', d.observaciones);
+            set('entregadoNombre', d.entregadoNombre);
+            set('entregadoCI', d.entregadoCI);
+            set('entregadoCargo', d.entregadoCargo);
+            set('recibidoNombre', d.recibidoNombre);
+            set('recibidoCI', d.recibidoCI);
+            set('recibidoCargo', d.recibidoCargo);
+            actualizarBotonesEquipo();
+            const radio = document.querySelector(`input[name="lugarServicio"][value="${d.lugarServicio}"]`);
+            if (radio) radio.checked = true;
+
+            // Firebase descarta los arreglos vacíos y puede devolver objetos en vez de arreglos: se normaliza.
+            const lista = Array.isArray(d.itemsData) ? d.itemsData : Object.values(d.itemsData || {});
+            itemsData = lista.map((it, idx) => {
+                const cond = {};
+                CONDICIONES_CAMPOS.forEach(c => { cond[c] = (it.condiciones && it.condiciones[c]) || CONDICIONES_POR_DEFECTO[c] || 'OK'; });
+                return {
+                    item: idx + 1,
+                    serial: it.serial || '',
+                    marca: it.marca || '',
+                    modelo: it.modelo || '',
+                    tipo: it.tipo || 'M',
+                    componentes: Array.isArray(it.componentes) ? it.componentes : Object.values(it.componentes || {}),
+                    condiciones: cond
+                };
+            });
+            if (!itemsData.length) crearNuevaFilaData(1);
+
+            // Conserva la fecha y hora originales de la recepción (no se pisan con las del dispositivo).
+            fechaHoraEditada = true;
+            renderTabla();
+        }
+
+        /** Con la base compartida, el correlativo local puede quedar atrás si se
+            guardó desde otro equipo: se toma el mayor número del año en Firebase. */
+        async function sincronizarCorrelativoRemoto() {
+            /* Un solo correlativo para Gases (LB-AAAA-NNNN, nodo "recepciones") y Presión
+               (PRES-AAAA-NNN, nodo "recepciones_presion"): se toma el mayor número del año
+               en AMBOS nodos, así crear una recepción en uno hace avanzar la del otro. */
+            const anio = new Date().getFullYear();
+            const enc = s => encodeURIComponent(s);
+            const antes = val('nroRecepcion');
+            const consultas = NODOS_CORRELATIVO.map(async ([nodo, pref]) => {
+                const prefijo = `${pref}-${anio}-`;
+                const params = `?orderBy=${enc('"$key"')}&startAt=${enc(JSON.stringify(prefijo))}`
+                             + `&endAt=${enc(JSON.stringify(prefijo + '\uf8ff'))}&limitToLast=50`;
+                const datos = await fbRequest(nodo, { params });
+                return Object.keys(datos || {}).map(k => parseInt(k.slice(prefijo.length), 10)).filter(Number.isFinite);
+            });
+            const resultados = await Promise.allSettled(consultas);   // sin conexión o sin permisos: se sigue con el local
+            const numeros = resultados.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+            if (numeros.length) {
+                const numero = Math.max(...numeros);
+                const guardado = leerCorrelativo();
+                if (!guardado || guardado.anio !== anio || numero > guardado.numero) guardarCorrelativo(anio, numero);
+            }
+            // Solo se reemplaza el número si el usuario no lo editó ni cargó una recepción guardada
+            if (val('nroRecepcion') === antes && !recepcionCargada) aplicarPropuesta();
+        }
+
+        window.addEventListener('DOMContentLoaded', sincronizarCorrelativoRemoto);
+
+        // Al volver a esta pestaña (p. ej. tras crear una recepción en el otro formulario) se refresca el número propuesto.
+        const resincronizarSiSinTocar = () => {
+            if (!document.hidden && !recepcionCargada && val('nroRecepcion') === nroPropuesto) sincronizarCorrelativoRemoto();
+        };
+        window.addEventListener('focus', resincronizarSiSinTocar);
+        document.addEventListener('visibilitychange', resincronizarSiSinTocar);
+  /*
+        function cargarEjemplo() {
+            document.getElementById('nroRecepcion').value = 'REC-2026-0042';
+            document.getElementById('cliente').value = 'PETROCARABOBO, S.A.';
+            document.getElementById('ordenServicio').value = 'OS-88401293';
+            document.getElementById('tempAmb').value = '24.5';
+            document.getElementById('humAmb').value = '55';
+            document.getElementById('paAmb').value = '1013';
+            document.getElementById('observaciones').value = 'Ítem 2 presenta desgaste en cubierta de goma. Ítem 3 ingresa sin cargador.';
+            
+            document.getElementById('entregadoNombre').value = 'Carlos Mendoza';
+            document.getElementById('entregadoCI').value = 'V-15.420.910';
+            document.getElementById('entregadoCargo').value = 'Supervisor HSE';
+
+            document.getElementById('recibidoNombre').value = 'Javier Bermúdez';
+            document.getElementById('recibidoCI').value = 'V-19.821.304';
+            document.getElementById('recibidoCargo').value = 'Especialista en Instrumentación';
+            actualizarBotonesEquipo();
+
+            itemsData = [
+                {
+                    item: 1, serial: 'BW-2026-7891', marca: 'BW Honeywell', modelo: 'MicroClip XL', tipo: 'M',
+                    componentes: ['CO', 'H2S', 'CH4', 'O2'],
+                    condiciones: { encendido: 'OK', bateria: 'OK', pantalla: 'OK', bomba: 'NA', cargador: 'OK', carcaza: 'OK', alarmaLuz: 'OK', alarmaSonido: 'OK', filtros: 'OK', conexionPanel: 'NA', kitCalibracion: 'OK', ultimoServicio: 'OK', vibracion: 'OK' }
+                },
+                {
+                    item: 2, serial: 'MSA-99210-A', marca: 'MSA', modelo: 'ALTAIR 4XR', tipo: 'M',
+                    componentes: ['CO', 'H2S', 'CH4', 'O2', 'SO2'],
+                    condiciones: { encendido: 'OK', bateria: 'OK', pantalla: 'OK', bomba: 'OK', cargador: 'OK', carcaza: 'RG', alarmaLuz: 'OK', alarmaSonido: 'OK', filtros: 'OK', conexionPanel: 'NA', kitCalibracion: 'OK', ultimoServicio: 'OK', vibracion: 'OK' }
+                }
+            ];
+            renderTabla();
+        }
+		*/
+
+        /* =====================================================================
+           EXPORTACIÓN A EXCEL SOBRE LA PLANTILLA REAL (ExcelJS)
+           ---------------------------------------------------------------------
+           Mapeo verificado contra RO-SGL-7.4-FT-01. Estructura de la plantilla:
+             · Hoja única: "Hoja1"  · Área de impresión: A1:V46 (horizontal)
+             · Cabecera en filas 6 y 7 (líneas con borde inferior)
+             · 7 ítems por hoja, cada uno ocupa 4 FILAS: 11, 15, 19, 23, 27, 31, 35
+               - A..E y J..V están combinadas verticalmente por ítem
+               - F..I son las casillas de componentes: etiquetas en base+0 y
+                 base+2, marcas en base+1 y base+3
+             · Observaciones: 4 renglones (C41, A42, A43, A44)
+             · Firmas: fila 46 (C46 entregado / O46 recibido)
+           A partir del ítem 8 se clona la hoja completa (formato, combinaciones,
+           anchos y configuración de impresión) y se continúa en la página 2, 3…
+           Solo se asigna .value. Nunca se tocan estilos ni bordes.
+           ===================================================================== */
+
+        const NOMBRE_HOJA = 'Hoja1';
+
+        /* La plantilla RO-SGL-7.4-FT-01 va incrustada aquí mismo, en base64,
+           para que el formulario funcione como un único archivo: no depende
+           de subir la plantilla cada vez ni de que exista una carpeta
+           "plantillas" junto al HTML al alojarlo o abrirlo con doble clic.
+           Si el formato oficial del laboratorio cambia, se reemplaza este
+           texto por el base64 del nuevo archivo (o se usa el botón "Cargar
+           Plantilla" para probar una distinta sin tocar el código). */
+        const PLANTILLA_BASE64 = "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";
+
+        let plantillaBuffer = null;
+
+        const MAPEO_CABECERA = {
+            nroRecepcion:  'C6',
+            fechaRecepcion:'F6',
+            horaRecepcion: 'K6',
+            cliente:       'N6',
+            ordenServicio: 'E7',
+            lugarLab:      'U6',
+            lugarInsitu:   'V6',
+            ambiente:      'V7',
+            observaciones: ['C41', 'A42', 'A43', 'A44'],
+            entregado:     'C46',
+            recibido:      'O46'
+        };
+
+        const TABLA = {
+            filaBase:   11,
+            altoBloque: 4,
+            porHoja:    7,          // ítems formateados en cada hoja
+            columnas: {
+                item: 'A', serial: 'B', marca: 'C', modelo: 'D', tipo: 'E',
+                encendido: 'J', bateria: 'K', pantalla: 'L', bomba: 'M',
+                cargador: 'N', carcaza: 'O', alarmaLuz: 'P', alarmaSonido: 'Q',
+                filtros: 'R', conexionPanel: 'S', kitCalibracion: 'T',
+                ultimoServicio: 'U', vibracion: 'V'
+            },
+            componentes: {
+                'CO':  ['F', 1], 'H2S': ['G', 1], 'CH4': ['H', 1], 'O2':    ['I', 1],
+                'NH3': ['F', 3], 'SO2': ['G', 3], 'CO2': ['H', 3], 'Otros': ['I', 3]
+            },
+            marca: 'OK'
+        };
+
+        /* ------------------------- utilidades ----------------------------- */
+
+        const val = id => (document.getElementById(id)?.value ?? '').trim();
+
+        function celdaDestino(ws, ref) {
+            const c = ws.getCell(ref);
+            return (c.isMerged && c.master) ? c.master : c;
+        }
+
+        function escribir(ws, ref, valor) {
+            if (!ref) return;
+            const c = celdaDestino(ws, ref);
+            if (c.value && typeof c.value === 'object' && 'formula' in c.value) return;
+            c.value = (valor === '' || valor === undefined) ? null : valor;
+        }
+
+        /** Hace que el texto de una celda se reduzca hasta caber (Excel: "Reducir hasta ajustar"),
+            sin tocar el resto de su estilo. Sirve para nombres de cliente y firmas largos. */
+        function reducirParaAjustar(ws, ref) {
+            const c = celdaDestino(ws, ref);
+            c.alignment = { ...(c.alignment || {}), shrinkToFit: true, wrapText: false };
+        }
+
+        function fechaTexto(iso) {
+            if (!iso) return '';
+            const [a, m, d] = iso.split('-');
+            return `${d}-${m}-${a}`;
+        }
+
+        function repartirTexto(texto, n, anchoAprox) {
+            const out = Array(n).fill('');
+            if (!texto) return out;
+            const palabras = texto.replace(/\s+/g, ' ').trim().split(' ');
+            let i = 0;
+            for (const p of palabras) {
+                if (i < n - 1 && out[i] && (out[i].length + p.length + 1) > anchoAprox) i++;
+                out[i] = out[i] ? out[i] + ' ' + p : p;
+            }
+            return out;
+        }
+
+        /** ExcelJS omite al guardar cualquier columna cuyo ancho sea 9 (su valor
+            por defecto interno), lo que encogía la columna U. Fijando el ancho
+            por defecto de la hoja en 9 esa columna vuelve a medir exactamente
+            lo mismo que en la plantilla. */
+        const ANCHO_POR_DEFECTO = 9;
+
+        /** Clona una hoja completa: anchos, alturas, combinaciones, estilos y
+            valores fijos. El orden importa: primero se combinan las celdas y
+            después se aplican los estilos, porque mergeCells() propaga el estilo
+            de la celda maestra y borraría los bordes inferiores de cada bloque. */
+        function clonarHoja(wb, origen, nombre) {
+            const destino = wb.addWorksheet(nombre, {
+                pageSetup:  JSON.parse(JSON.stringify(origen.pageSetup  || {})),
+                properties: JSON.parse(JSON.stringify(origen.properties || {})),
+                views:      JSON.parse(JSON.stringify(origen.views      || []))
+            });
+
+            const filas    = origen.rowCount;
+            const columnas = origen.columnCount;
+
+            // 1) Anchos de columna
+            for (let c = 1; c <= columnas; c++) {
+                const col = origen.getColumn(c);
+                if (col.width)  destino.getColumn(c).width  = col.width;
+                if (col.hidden) destino.getColumn(c).hidden = true;
+            }
+            aplicarAnchosFijos(destino);
+
+            // 2) Combinaciones (antes que los estilos)
+            (origen.model.merges || []).forEach(m => { try { destino.mergeCells(m); } catch (e) {} });
+
+            // 3) Alturas, estilos y textos fijos de la plantilla
+            for (let r = 1; r <= filas; r++) {
+                const fo = origen.getRow(r), fd = destino.getRow(r);
+                if (fo.height) fd.height = fo.height;
+                if (fo.hidden) fd.hidden = true;   // filas ocultas de la plantilla (43-45) también en las páginas clonadas
+                for (let c = 1; c <= columnas; c++) {
+                    const co = fo.getCell(c), cd = fd.getCell(c);
+                    if (co.style) cd.style = JSON.parse(JSON.stringify(co.style));
+                    if (cd.isMerged && cd.master !== cd) continue;   // el valor vive en la maestra
+                    const v = co.value;
+                    if (v && typeof v === 'object' && v.formula) cd.value = { formula: v.formula };
+                    else if (v !== null && v !== undefined)       cd.value = v;
+                }
+            }
+
+            // 4) Imágenes embebidas (el logo), con la misma posición y tamaño.
+            (origen.getImages() || []).forEach(img => {
+                try {
+                    const media   = wb.getImage(img.imageId);
+                    const nuevoId = wb.addImage({ buffer: media.buffer, extension: media.extension });
+                    destino.addImage(nuevoId, {
+                        tl: { nativeCol: img.range.tl.nativeCol, nativeColOff: img.range.tl.nativeColOff || 0, nativeRow: img.range.tl.nativeRow, nativeRowOff: img.range.tl.nativeRowOff || 0 },
+                        br: { nativeCol: img.range.br.nativeCol, nativeColOff: img.range.br.nativeColOff || 0, nativeRow: img.range.br.nativeRow, nativeRowOff: img.range.br.nativeRowOff || 0 },
+                        editAs: img.range.editAs
+                    });
+                } catch (e) { /* si la plantilla no trae imagen, se omite sin romper la copia */ }
+            });
+
+            return destino;
+        }
+
+        function aplicarAnchosFijos(ws) {
+            ws.properties = ws.properties || {};
+            ws.properties.defaultColWidth = ANCHO_POR_DEFECTO;
+        }
+
+        /** Decodifica el base64 incrustado a un ArrayBuffer, tal como lo
+            necesita ExcelJS. No depende de Buffer de Node (no existe en el
+            navegador), solo de atob(), disponible en cualquier navegador. */
+        function base64ABuffer(base64) {
+            const binario = atob(base64);
+            const bytes = new Uint8Array(binario.length);
+            for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+            return bytes.buffer;
+        }
+
+        async function obtenerPlantilla() {
+            if (plantillaBuffer) return plantillaBuffer;
+            try {
+                plantillaBuffer = base64ABuffer(PLANTILLA_BASE64);
+                return plantillaBuffer;
+            } catch (e) {
+                // Solo debería llegar aquí si el base64 incrustado se corrompió
+                // al editar el archivo a mano; se ofrece elegir el .xlsx a mano.
+                return await pedirPlantillaAlUsuario();
+            }
+        }
+
+        function pedirPlantillaAlUsuario() {
+            return new Promise((resolve, reject) => {
+                const input = document.getElementById('inputPlantilla');
+                const onChange = async () => {
+                    input.removeEventListener('change', onChange);
+                    const f = input.files[0];
+                    input.value = '';
+                    if (!f) return reject(new Error('No se seleccionó ningún archivo .xlsx'));
+                    plantillaBuffer = await f.arrayBuffer();
+                    resolve(plantillaBuffer);
+                };
+                input.addEventListener('change', onChange);
+                input.click();
+            });
+        }
+
+        /** Botón "Cargar Plantilla": permite probar otra plantilla distinta a
+            la incrustada, sin tocar el código, solo para la sesión actual
+            (se pierde al recargar la página). */
+        async function seleccionarPlantilla() {
+            plantillaBuffer = null;
+            try {
+                await pedirPlantillaAlUsuario();
+                avisar('Plantilla cargada para esta sesión. Ya puede exportar.');
+            } catch (e) { /* cancelado por el usuario */ }
+        }
+
+
+        /* ------------------------- exportación ---------------------------- */
+
+        /** Rellena la cabecera de una hoja (se repite en todas las páginas). */
+        function llenarCabecera(ws) {
+            const M = MAPEO_CABECERA;
+            escribir(ws, M.nroRecepcion,   val('nroRecepcion'));
+            escribir(ws, M.fechaRecepcion, fechaTexto(val('fechaRecepcion') || fechaLocalISO()));
+            escribir(ws, M.horaRecepcion,  val('horaRecepcion') || horaLocal());
+            escribir(ws, M.cliente,        val('cliente'));
+            reducirParaAjustar(ws, M.cliente);
+            escribir(ws, M.ordenServicio,  val('ordenServicio'));
+
+            const lugar = document.querySelector('input[name="lugarServicio"]:checked')?.value || 'Lab';
+            escribir(ws, M.lugarLab,    (lugar === 'Lab'    ? 'X  Lab'    : '     Lab'));
+            escribir(ws, M.lugarInsitu, (lugar === 'Insitu' ? 'X  Insitu' : '      Insitu'));
+
+            escribir(ws, M.ambiente,
+                `Temp: ${val('tempAmb') || '—'} °C\nHum: ${val('humAmb') || '—'} %\nP.A.: ${val('paAmb') || '—'} mbar`);
+        }
+
+        /** Escribe hasta 7 ítems en una hoja y limpia los espacios sobrantes. */
+        function llenarItems(ws, lote, numeroInicial) {
+            const C = TABLA.columnas;
+            for (let i = 0; i < TABLA.porHoja; i++) {
+                const base = TABLA.filaBase + i * TABLA.altoBloque;
+                const row  = lote[i] || null;
+
+                escribir(ws, C.item   + base, numeroInicial + i);
+                escribir(ws, C.serial + base, row ? row.serial : null);
+                escribir(ws, C.marca  + base, row ? row.marca  : null);
+                escribir(ws, C.modelo + base, row ? row.modelo : null);
+                escribir(ws, C.tipo   + base, row ? row.tipo   : null);
+
+                Object.entries(TABLA.componentes).forEach(([comp, [col, off]]) => {
+                    const marcado = row && row.componentes.includes(comp);
+                    // Si la fila existe (ítem cargado), un componente no marcado se
+                    // reporta como "NA" en vez de dejar la casilla vacía; las filas
+                    // sin uso (más allá de los ítems ingresados) se dejan en blanco.
+                    escribir(ws, col + (base + off), row ? (marcado ? TABLA.marca : 'NA') : null);
+                });
+
+                CONDICIONES_CAMPOS.forEach(campo => {
+                    escribir(ws, C[campo] + base, row ? (row.condiciones[campo] || '') : null);
+                });
+            }
+        }
+
+        /** Observaciones y firmas: solo en la última página. */
+        function llenarCierre(ws) {
+            const M = MAPEO_CABECERA;
+            const lineas = repartirTexto(val('observaciones'), M.observaciones.length, 110);
+            M.observaciones.forEach((ref, i) => escribir(ws, ref, lineas[i]));
+
+            const firma = (n, ci, cargo) =>
+                [n, ci ? 'C.I.: ' + ci : '', cargo].filter(Boolean).join('  |  ');
+            escribir(ws, M.entregado, firma(val('entregadoNombre'), val('entregadoCI'), val('entregadoCargo')));
+            escribir(ws, M.recibido,  firma(val('recibidoNombre'),  val('recibidoCI'),  val('recibidoCargo')));
+            reducirParaAjustar(ws, M.entregado);
+            reducirParaAjustar(ws, M.recibido);
+        }
+
+        /** Arma el libro de Excel completo (todas las páginas necesarias, ya
+            rellenas con los datos del formulario) a partir de la plantilla.
+            Lo usan tanto "Exportar Excel" como "Exportar PDF", así ambos
+            formatos parten exactamente de los mismos datos y el mismo diseño. */
+        async function armarLibroDesdeFormulario() {
+            const buffer = await obtenerPlantilla();
+
+            const wb = new ExcelJS.Workbook();
+            await wb.xlsx.load(buffer);
+            const hoja1 = wb.getWorksheet(NOMBRE_HOJA) || wb.worksheets[0];
+            if (!hoja1) throw new Error('La plantilla no contiene hojas.');
+            aplicarAnchosFijos(hoja1);
+
+            const paginas = Math.max(1, Math.ceil(itemsData.length / TABLA.porHoja));
+            const hojas = [];
+
+            for (let p = 0; p < paginas; p++) {
+                const ws = (p === 0) ? hoja1
+                                     : clonarHoja(wb, hoja1, `Recepción ${p + 1} de ${paginas}`);
+
+                const lote = itemsData.slice(p * TABLA.porHoja, (p + 1) * TABLA.porHoja);
+                llenarCabecera(ws);
+                llenarItems(ws, lote, p * TABLA.porHoja + 1);
+                if (p === paginas - 1) llenarCierre(ws);
+                hojas.push(ws);
+            }
+
+            if (paginas > 1) hoja1.name = `Recepción 1 de ${paginas}`;
+
+            wb.calcProperties = wb.calcProperties || {};
+            wb.calcProperties.fullCalcOnLoad = true;
+
+            return { wb, hojas };
+        }
+
+        async function exportarExcel() {
+            let libro;
+            try {
+                libro = await armarLibroDesdeFormulario();
+            } catch (e) {
+                avisar('No se pudo generar el Excel: ' + e.message, 'error');
+                return;
+            }
+
+            const out  = await libro.wb.xlsx.writeBuffer();
+            const blob = new Blob([out], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+            const url = URL.createObjectURL(blob);
+            const a   = document.createElement('a');
+            a.href     = url;
+            a.download = `RO-SGL-7.4-FT-01_${val('nroRecepcion') || 'Recepcion'}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+        
+        /* =====================================================================
+           EXPORTAR A PDF CON EL FORMATO EXACTO DE LA PLANTILLA
+           ---------------------------------------------------------------------
+           El botón "Imprimir / PDF" ya no imprime el formulario web (que tiene
+           su propio diseño en Tailwind): genera un PDF a partir del MISMO libro
+           de Excel que produce "Exportar Excel" (armarLibroDesdeFormulario),
+           reconstruyendo cada hoja como una tabla HTML con los bordes, colores,
+           fuentes y celdas combinadas leídos directamente de la plantilla, y
+           la rasteriza con html2canvas + jsPDF. El PDF resultante reproduce la
+           plantilla tal cual está, sin pasar por el diseño de la página web.
+           (ACTUALIZADO: ahora el PDF es vectorial: se dibuja con jsPDF directamente
+           desde el libro de Excel, con las mismas medidas que usa Excel al imprimir.)
+           ===================================================================== */
+
+        /* Paleta del tema "Office" por defecto. Solo se usa cuando una celda
+           referencia un color por número de tema (fill.fgColor.theme, etc.)
+           en lugar de un color directo (argb). Es la paleta estándar que trae
+           cualquier libro nuevo de Excel salvo que el autor haya cambiado el
+           tema del documento. */
+        const TEMA_OFFICE = ['FFFFFF', '000000', 'E7E6E6', '44546A',
+                              '4472C4', 'ED7D31', 'A5A5A5', 'FFC000', '5B9BD5', '70AD47'];
+
+        function aplicarTinte(hex, tint) {
+            const c = [0, 2, 4].map(i => parseInt(hex.substr(i, 2), 16));
+            const ajustado = c.map(v => tint < 0 ? v * (1 + tint) : v + (255 - v) * tint);
+            return '#' + ajustado.map(v => Math.max(0, Math.min(255, Math.round(v)))
+                                              .toString(16).padStart(2, '0')).join('');
+        }
+
+        /** Convierte un color de ExcelJS (argb directo, tema+tinte, o índice
+            de la paleta heredada) a un color CSS. `paraRelleno` decide qué
+            devolver cuando el color es "automático" (índice 64): nada para
+            relleno (transparente) y negro para texto o bordes. */
+        function colorCss(colorObj, paraRelleno = false) {
+            if (!colorObj) return paraRelleno ? null : '#000000';
+            if (colorObj.argb) return '#' + colorObj.argb.slice(2);
+            if (colorObj.theme !== undefined) {
+                const base = TEMA_OFFICE[colorObj.theme] || '000000';
+                return aplicarTinte(base, colorObj.tint || 0);
+            }
+            if (colorObj.indexed !== undefined) {
+                if (colorObj.indexed === 64) return paraRelleno ? null : '#000000'; // auto
+                if (colorObj.indexed === 65) return '#ffffff';
+                return '#000000';
+            }
+            return paraRelleno ? null : '#000000';
+        }
+
+        /** Convierte un buffer binario (ArrayBuffer/Uint8Array) a base64,
+            sin depender de Buffer de Node (no existe en el navegador). */
+        function bufferABase64(buffer) {
+            const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+            let binario = '';
+            const bloque = 0x8000;
+            for (let i = 0; i < bytes.length; i += bloque) {
+                binario += String.fromCharCode.apply(null, bytes.subarray(i, i + bloque));
+            }
+            return btoa(binario);
+        }
+
+        /* =====================================================================
+           PDF VECTORIAL DESDE LA HOJA DE EXCEL
+           Cada hoja del libro se dibuja con jsPDF usando las mismas medidas que
+           Excel: ancho de columna (px = ancho x 7), alto de fila en puntos,
+           celdas combinadas, rellenos, bordes, alineación vertical (por defecto
+           abajo, como Excel), saltos de línea y área de impresión. Se escala solo
+           hacia abajo para caber en la página y se centra horizontalmente.
+           ===================================================================== */
+        const PX_A_PT = 0.75;
+        const letrasANum = t => [...t].reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0);
+        const rgbDeCss = css => { const h = String(css || '#000000').replace('#', ''); return [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16) || 0); };
+
+        function anchoColPt(ws, c) {
+            const col = ws.getColumn(c);
+            if (col.hidden) return 0;
+            const w = col.width || (ws.properties && ws.properties.defaultColWidth) || 8.43;
+            return Math.round(w * 7) * PX_A_PT;
+        }
+        function altoFilaPt(ws, r) {
+            const fila = ws.getRow(r);
+            if (fila.hidden) return 0;
+            return fila.height || (ws.properties && ws.properties.defaultRowHeight) || 15;
+        }
+        function rangoImpresion(ws) {
+            const pa = ws.pageSetup && ws.pageSetup.printArea;
+            const m = pa && /\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)/.exec(String(pa));
+            if (m) return { c1: letrasANum(m[1]), r1: +m[2], c2: letrasANum(m[3]), r2: +m[4] };
+            return { c1: 1, r1: 1, c2: Math.min(ws.columnCount || 21, 21), r2: ws.rowCount };
+        }
+        function mapaCombinaciones(ws) {
+            const ancla = {}, cubierta = {};
+            (ws.model.merges || []).forEach(rg => {
+                const m = /^\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)$/.exec(rg);
+                if (!m) return;
+                const o = { c1: letrasANum(m[1]), r1: +m[2], c2: letrasANum(m[3]), r2: +m[4] };
+                ancla[o.r1 + ':' + o.c1] = o;
+                for (let r = o.r1; r <= o.r2; r++) for (let c = o.c1; c <= o.c2; c++)
+                    if (r !== o.r1 || c !== o.c1) cubierta[r + ':' + c] = o;
+            });
+            return { ancla, cubierta };
+        }
+
+        /* ---- fuentes ---- */
+        function estiloFuente(f) {
+            f = f || {};
+            return { name: f.name || 'Arial', size: f.size || 10, bold: !!f.bold, italic: !!f.italic, underline: !!f.underline,
+                     color: f.color ? colorCss(f.color) : '#000000' };
+        }
+        function estiloRun(f, base) {          // en el texto con formato mixto cada tramo define su propio estilo
+            if (!f) return base;
+            return { name: f.name || base.name, size: f.size || base.size, bold: !!f.bold, italic: !!f.italic,
+                     underline: !!f.underline, color: f.color ? colorCss(f.color) : base.color };
+        }
+        function fuentePdf(est) {
+            const n = String(est.name || '').toLowerCase();
+            const fam = /times|georgia|garamond|cambria/.test(n) ? 'times' : /courier|consolas|mono/.test(n) ? 'courier' : 'helvetica';
+            return [fam, est.bold ? (est.italic ? 'bolditalic' : 'bold') : (est.italic ? 'italic' : 'normal')];
+        }
+        /** Calibri no viene en los PDF estándar y es ~13% más angosta que Helvetica: se reduce el tamaño para
+            que el texto ocupe el mismo ancho que en Excel (si no, se corta o salta de línea de más). */
+        function tamPdf(est) {
+            return est.size * (/calibri|carlito/i.test(est.name || '') ? (est.bold ? 0.85 : 0.89) : 1);
+        }
+        const cacheAnchoTexto = {};
+        function medirTexto(pdf, t, est) {
+            const [fam, sty] = fuentePdf(est);
+            const k = fam + sty + tamPdf(est) + '|' + t;
+            if (cacheAnchoTexto[k] === undefined) { pdf.setFont(fam, sty); pdf.setFontSize(tamPdf(est)); cacheAnchoTexto[k] = pdf.getTextWidth(t); }
+            return cacheAnchoTexto[k];
+        }
+
+        /** Parte el texto en líneas (respeta \n y, si hay ajuste de texto, parte por palabras o por letras). */
+        function disponerLineas(pdf, segs, ancho, ajustar, tamBase) {
+            const parrafos = [[]];
+            segs.forEach(sg => {
+                String(sg.t).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/\u00a0/g, ' ').split(/\r?\n/).forEach((trozo, i) => {
+                    if (i > 0) parrafos.push([]);
+                    trozo.split(/(\s+)/).forEach(tok => {
+                        if (tok === '') return;
+                        const esp = /^\s+$/.test(tok);
+                        // además de los espacios, el texto puede partirse después de "/" y "-"
+                        (esp ? [tok] : (tok.match(/[^\/-]+[\/-]?|[\/-]/g) || [tok])).forEach(pz => parrafos[parrafos.length - 1].push({ t: pz, est: sg.est, esp }));
+                    });
+                });
+            });
+            const lineas = [];
+            parrafos.forEach(par => {
+                let ln = { p: [], w: 0 }, cont = false;
+                const cerrar = () => {
+                    while (ln.p.length && ln.p[ln.p.length - 1].esp) ln.w -= ln.p.pop().w;
+                    ln.size = ln.p.length ? Math.max(...ln.p.map(x => x.est.size)) : tamBase;
+                    lineas.push(ln); ln = { p: [], w: 0 };
+                };
+                par.forEach(tok0 => {
+                    let tok = tok0, w = medirTexto(pdf, tok.t, tok.est);
+                    if (ajustar) {
+                        if (tok.esp && !ln.p.length && cont) return;                         // sin espacios al inicio de línea
+                        if (!tok.esp && ln.p.length && ln.w + w > ancho + 0.01) { cerrar(); cont = true; }
+                        while (!tok.esp && w > ancho + 0.01 && tok.t.length > 1) {   // palabra más ancha que la celda
+                            let n = tok.t.length - 1;
+                            while (n > 1 && medirTexto(pdf, tok.t.slice(0, n), tok.est) > ancho) n--;
+                            const cab = { t: tok.t.slice(0, n), est: tok.est, esp: false };
+                            cab.w = medirTexto(pdf, cab.t, cab.est); ln.p.push(cab); ln.w += cab.w; cerrar(); cont = true;
+                            tok = { t: tok.t.slice(n), est: tok.est, esp: false }; w = medirTexto(pdf, tok.t, tok.est);
+                        }
+                    }
+                    ln.p.push({ t: tok.t, est: tok.est, esp: tok.esp, w }); ln.w += w;
+                });
+                cerrar();
+            });
+            return lineas;
+        }
+        function recortarLinea(pdf, ln, maxW) {
+            if (ln.w <= maxW + 0.01) return ln;
+            const out = { p: [], w: 0, size: ln.size };
+            for (const pz of ln.p) {
+                if (out.w + pz.w <= maxW) { out.p.push(pz); out.w += pz.w; continue; }
+                let n = pz.t.length;
+                while (n > 0 && out.w + medirTexto(pdf, pz.t.slice(0, n), pz.est) > maxW) n--;
+                if (n > 0) { const t = pz.t.slice(0, n), w = medirTexto(pdf, t, pz.est); out.p.push({ t, est: pz.est, esp: pz.esp, w }); out.w += w; }
+                break;
+            }
+            return out;
+        }
+
+        /* ---- bordes ---- */
+        function propsBorde(b) {
+            if (!b || !b.style) return null;
+            const ancho = { hair: 0.35, thin: 0.6, dotted: 0.6, dashed: 0.6, dashDot: 0.6, dashDotDot: 0.6, medium: 1.2, mediumDashed: 1.2,
+                            mediumDashDot: 1.2, mediumDashDotDot: 1.2, slantDashDot: 1.2, double: 1.2, thick: 1.9 }[b.style] || 0.6;
+            const dash = b.style === 'dotted' ? [0.6, 1.2] : /dash/i.test(b.style) ? [3, 1.5] : null;
+            return { w: ancho, dash, color: colorCss(b.color) || '#000000' };
+        }
+
+        /** Convierte un PNG a JPEG sobre fondo blanco (solo si jsPDF no pudo leer el PNG). */
+        function pngAJpeg(dataUrl) {
+            return new Promise((resolve, reject) => {
+                const im = new Image();
+                im.onload = () => {
+                    const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+                    const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(im, 0, 0);
+                    resolve(cv.toDataURL('image/jpeg', 0.95));
+                };
+                im.onerror = reject; im.src = dataUrl;
+            });
+        }
+
+        async function dibujarHoja(pdf, ws, wb, PW, PH) {
+            const rg = rangoImpresion(ws), { ancla, cubierta } = mapaCombinaciones(ws);
+            // Geometría de la hoja en puntos (sin escala)
+            const colX = {}, rowY = {};
+            let acc = 0; for (let c = rg.c1; c <= rg.c2; c++) { colX[c] = acc; acc += anchoColPt(ws, c); } colX[rg.c2 + 1] = acc; const totW = acc;
+            acc = 0; for (let r = rg.r1; r <= rg.r2; r++) { rowY[r] = acc; acc += altoFilaPt(ws, r); } rowY[rg.r2 + 1] = acc; const totH = acc;
+            // Página: se escala solo hacia abajo (como "ajustar a 1 página") y se centra en horizontal
+            const mg = (ws.pageSetup && ws.pageSetup.margins) || {};
+            const ml = (mg.left ?? 0.2) * 72, mr = (mg.right ?? 0.2) * 72, mt = (mg.top ?? 0.2) * 72, mb = (mg.bottom ?? 0.2) * 72;
+            const s = Math.min(1, (PW - ml - mr) / totW, (PH - mt - mb) / totH);
+            const x0 = ml + ((PW - ml - mr) - totW * s) / 2, y0 = mt;
+            const X = v => x0 + v * s, Y = v => y0 + v * s;
+            const rectDe = o => {
+                const c2 = Math.min(o.c2, rg.c2), r2 = Math.min(o.r2, rg.r2);
+                return { x: colX[o.c1], y: rowY[o.r1], w: colX[c2 + 1] - colX[o.c1], h: rowY[r2 + 1] - rowY[o.r1] };
+            };
+            const celdaDe = (r, c) => ws.getRow(r).getCell(c);
+            const regiones = [];
+            for (let r = rg.r1; r <= rg.r2; r++) for (let c = rg.c1; c <= rg.c2; c++) {
+                const k = r + ':' + c;
+                if (cubierta[k]) continue;
+                regiones.push(ancla[k] || { c1: c, r1: r, c2: c, r2: r });
+            }
+
+            // 1) Rellenos
+            regiones.forEach(o => {
+                const rc = rectDe(o), fl = celdaDe(o.r1, o.c1).fill;
+                if (!fl || fl.type !== 'pattern' || fl.pattern !== 'solid') return;
+                const css = colorCss(fl.fgColor, true);
+                if (!css || css.toLowerCase() === '#ffffff') return;
+                pdf.setFillColor(...rgbDeCss(css));
+                pdf.rect(X(rc.x) - 0.2, Y(rc.y) - 0.2, rc.w * s + 0.4, rc.h * s + 0.4, 'F');
+            });
+
+            // 2) Imágenes (logo), con su posición exacta dentro de las celdas
+            for (const img of (ws.getImages() || [])) {
+                try {
+                    const media = wb.getImage(img.imageId), tl = img.range.tl, br = img.range.br;
+                    const posX = a => (colX[a.nativeCol + 1] ?? (a.nativeCol + 1 > rg.c2 ? totW : 0)) + (a.nativeColOff || 0) / 12700;
+                    const posY = a => (rowY[a.nativeRow + 1] ?? (a.nativeRow + 1 > rg.r2 ? totH : 0)) + (a.nativeRowOff || 0) / 12700;
+                    const ix = posX(tl), iy = posY(tl);
+                    const iw = br ? posX(br) - ix : (img.range.ext ? img.range.ext.width * PX_A_PT : 0);
+                    const ih = br ? posY(br) - iy : (img.range.ext ? img.range.ext.height * PX_A_PT : 0);
+                    if (iw <= 0 || ih <= 0) continue;
+                    const ext = String(media.extension || 'png').toLowerCase();
+                    let url = `data:image/${ext};base64,${bufferABase64(media.buffer)}`, fmt = /jpe?g/.test(ext) ? 'JPEG' : 'PNG';
+                    try { pdf.addImage(url, fmt, X(ix), Y(iy), iw * s, ih * s, undefined, 'FAST'); }
+                    catch (e) { url = await pngAJpeg(url); pdf.addImage(url, 'JPEG', X(ix), Y(iy), iw * s, ih * s); }
+                } catch (e) { /* una imagen que no se pueda leer no impide generar el PDF */ }
+            }
+
+            // 3) Textos
+            const vacia = (r, c) => {
+                const o = cubierta[r + ':' + c], cel = o ? celdaDe(o.r1, o.c1) : celdaDe(r, c);
+                try { return !String(cel.text ?? '').trim(); } catch (e) { return true; }
+            };
+            regiones.forEach(o => {
+                const cel = celdaDe(o.r1, o.c1), al = cel.alignment || {}, v = cel.value;
+                const base = estiloFuente(cel.font);
+                let segs;
+                if (v && typeof v === 'object' && Array.isArray(v.richText)) segs = v.richText.map(rn => ({ t: rn.text || '', est: estiloRun(rn.font, base) }));
+                else segs = [{ t: String(cel.text ?? ''), est: base }];
+                if (!segs.some(sg => String(sg.t).trim())) return;
+                const rc = rectDe(o);
+                const ajustar = !!al.wrapText;
+                const padH = 1.0 + (al.indent || 0) * 3, padV = 1;
+                const valor = (v && typeof v === 'object' && 'result' in v) ? v.result : v;
+                let h = al.horizontal;
+                if (!h || h === 'general') h = typeof valor === 'number' ? 'right' : 'left';
+                if (h === 'centerContinuous') h = 'center';
+                const vert = al.vertical === 'middle' ? 'center' : (al.vertical || 'bottom');
+                // "Reducir hasta ajustar" (Excel): el texto se achica para caber en una sola línea dentro de la celda
+                if (al.shrinkToFit && !ajustar) {
+                    const w0 = Math.max(0, ...disponerLineas(pdf, segs, 1e9, false, base.size).map(l => l.w));
+                    const disp = rc.w - 2 * padH;
+                    if (w0 > disp) {
+                        const f = Math.max(0.4, disp / w0 * 0.99);
+                        segs = segs.map(sg => ({ t: sg.t, est: { ...sg.est, size: sg.est.size * f } }));
+                    }
+                }
+                let lineas = disponerLineas(pdf, segs, rc.w - 2 * padH + 1, ajustar, base.size);   // +1 pt de tolerancia, como Excel
+                const paso = ln => ln.size * 1.14;
+                const altoBloque = lineas.reduce((a, ln) => a + paso(ln), 0);
+                let yTop = vert === 'top' ? rc.y + padV : vert === 'center' ? rc.y + (rc.h - altoBloque) / 2 : rc.y + rc.h - padV - altoBloque;
+
+                // Texto sin ajuste: puede desbordar sobre celdas vecinas vacías (como en Excel)
+                let regIzq = rc.x + padH, regDer = rc.x + rc.w - padH;
+                if (!ajustar) {
+                    const maxW = Math.max(...lineas.map(l => l.w));
+                    if (maxW > regDer - regIzq) {
+                        let izq = 0, der = 0;
+                        if (o.c1 === o.c2) {   // solo las celdas sin combinar pueden desbordar sobre las vecinas vacías
+                            for (let c = o.c2 + 1; c <= rg.c2 && vacia(o.r1, c); c++) der += colX[c + 1] - colX[c];
+                            for (let c = o.c1 - 1; c >= rg.c1 && vacia(o.r1, c); c--) izq += colX[c + 1] - colX[c];
+                        }
+                        if (h === 'right') regIzq -= izq; else if (h === 'center') { const e = Math.min(izq, der); regIzq -= e; regDer += e; } else regDer += der;
+                        lineas = lineas.map(ln => recortarLinea(pdf, ln, regDer - regIzq + 4));
+                    }
+                }
+                lineas.forEach(ln => {
+                    const alto = paso(ln), top = yTop; yTop += alto;
+                    // Una línea que no cabe en la celda no se dibuja (Excel la recorta)
+                    if (top < rc.y - 0.2 * alto || top + alto > rc.y + rc.h + 0.2 * alto) return;
+                    const baseY = top + (alto - 1.117 * ln.size) / 2 + 0.905 * ln.size;
+                    let px = h === 'right' ? regDer - ln.w : h === 'center' ? (regIzq + regDer) / 2 - ln.w / 2 : regIzq;
+                    ln.p.forEach(pz => {
+                        if (!pz.esp) {
+                            const [fam, sty] = fuentePdf(pz.est);
+                            pdf.setFont(fam, sty); pdf.setFontSize(tamPdf(pz.est) * s);
+                            pdf.setTextColor(...rgbDeCss(pz.est.color));
+                            pdf.text(pz.t, X(px), Y(baseY), { baseline: 'alphabetic' });
+                            if (pz.est.underline) {
+                                pdf.setDrawColor(...rgbDeCss(pz.est.color)); pdf.setLineDashPattern([], 0);
+                                pdf.setLineWidth(Math.max(0.3, pz.est.size * 0.06 * s));
+                                pdf.line(X(px), Y(baseY + pz.est.size * 0.12), X(px + pz.w), Y(baseY + pz.est.size * 0.12));
+                            }
+                        }
+                        px += pz.w;
+                    });
+                });
+            });
+
+            // 4) Bordes (al final, encima de rellenos y textos). Las combinadas solo dibujan su contorno exterior.
+            const bordes = {};
+            const agregar = (b, x1, y1, x2, y2) => {
+                const pr = propsBorde(b); if (!pr) return;
+                bordes[[x1, y1, x2, y2, pr.w, pr.color, pr.dash].join('|')] = { ...pr, x1, y1, x2, y2 };
+            };
+            for (let r = rg.r1; r <= rg.r2; r++) for (let c = rg.c1; c <= rg.c2; c++) {
+                const k = r + ':' + c, mo = cubierta[k] || ancla[k] || null, bd = celdaDe(r, c).border || {};
+                const x1 = colX[c], x2 = colX[c + 1], y1 = rowY[r], y2 = rowY[r + 1];
+                if (!mo || r === mo.r1) agregar(bd.top, x1, y1, x2, y1);
+                if (!mo || r === mo.r2) agregar(bd.bottom, x1, y2, x2, y2);
+                if (!mo || c === mo.c1) agregar(bd.left, x1, y1, x1, y2);
+                if (!mo || c === mo.c2) agregar(bd.right, x2, y1, x2, y2);
+            }
+            Object.values(bordes).sort((a, b) => a.w - b.w).forEach(e => {
+                pdf.setDrawColor(...rgbDeCss(e.color));
+                pdf.setLineWidth(e.w * s);
+                if (e.dash) { pdf.setLineDashPattern(e.dash.map(d => d * s), 0); pdf.setLineCap(0); }
+                else { pdf.setLineDashPattern([], 0); pdf.setLineCap(2); }
+                pdf.line(X(e.x1), Y(e.y1), X(e.x2), Y(e.y2));
+            });
+            pdf.setLineDashPattern([], 0); pdf.setLineCap(0);
+        }
+
+        /** Arma el PDF completo (una página por hoja del libro de Excel, con la orientación de cada hoja). */
+        async function construirPDF() {
+            const libro = await armarLibroDesdeFormulario();
+            const { jsPDF } = window.jspdf;
+            const nombre = `RO-SGL-7.4-FT-01_${val('nroRecepcion') || 'Recepcion'}.pdf`;
+            const orientacion = h => (h.pageSetup && h.pageSetup.orientation === 'landscape') ? 'landscape' : 'portrait';
+            const pdf = new jsPDF({ orientation: orientacion(libro.hojas[0]), unit: 'pt', format: 'a4', compress: true });
+            pdf.setProperties({ title: nombre.replace(/\.pdf$/i, ''), subject: 'RO-SGL-7.4-FT-01 Recepción de Equipos Detectores de Gases', creator: 'RO-SGL-7.4-FT-01' });
+            for (let i = 0; i < libro.hojas.length; i++) {
+                const o = orientacion(libro.hojas[i]);
+                if (i > 0) pdf.addPage('a4', o);
+                await dibujarHoja(pdf, libro.hojas[i], libro.wb, o === 'landscape' ? 841.89 : 595.28, o === 'landscape' ? 595.28 : 841.89);
+            }
+            return { pdf, nombre };
+        }
+
+        let generandoPDF = false;
+        /** Ejecuta una acción de PDF mostrando "Generando..." en el botón y evitando dobles clics. */
+        async function tareaPDF(selector, accion) {
+            if (generandoPDF) return;
+            generandoPDF = true;
+            const btn = document.querySelector(selector);
+            const html = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.classList.add('opacity-60', 'cursor-wait'); btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generando...'; }
+            try { await accion(); }
+            catch (e) { avisar('No se pudo generar el PDF: ' + (e && e.message ? e.message : e), 'error'); }
+            finally {
+                generandoPDF = false;
+                if (btn) { btn.disabled = false; btn.classList.remove('opacity-60', 'cursor-wait'); btn.innerHTML = html; }
+            }
+        }
+        async function exportarPDF() {
+            return tareaPDF('button[onclick="exportarPDF()"]', async () => {
+                const { pdf, nombre } = await construirPDF();
+                pdf.save(nombre);
+            });
+        }
+        /** Abre el cuadro de impresión del navegador con el mismo PDF (si el navegador lo bloquea, lo abre en otra pestaña). */
+        async function imprimirPDF() {
+            return tareaPDF('button[onclick="imprimirPDF()"]', async () => {
+                const { pdf } = await construirPDF();
+                const url = URL.createObjectURL(pdf.output('blob'));
+                const f = document.createElement('iframe');
+                f.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0';
+                f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { window.open(url, '_blank'); } };
+                f.src = url; document.body.appendChild(f);
+                setTimeout(() => { URL.revokeObjectURL(url); f.remove(); }, 5 * 60 * 1000);
+            });
+        }
+
+        /* ======================================================================
+           ETIQUETAS DE IDENTIFICACIÓN (RO-SGL-7.4-ET-01) - 60 x 60 mm
+           Una etiqueta por equipo de la recepción cargada en el formulario.
+           Se dibujan en vectores con jsPDF replicando la plantilla oficial y se
+           acomodan 12 por hoja A4 (3 columnas x 4 filas).
+           ====================================================================== */
+        const ETQ_LOGO = 'data:image/png;base64,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';
+        const ETQ_EQUIPO = 'Detector de Gases';
+        const ETQ = {
+            w: 170.08, h: 170.08,                       // 60 x 60 mm (pt)
+            naranja: [247, 150, 70], naranjaOsc: [227, 112, 20], tinte: [253, 233, 217],
+            filas: [                                    // [rótulo, alto de fila (pt), máx. de líneas]
+                ['EQUIPO:', 17, 2], ['FECHA DE RECEPCION:', 12, 1], ['CLIENTE:', 12, 1],
+                ['SERIAL:', 12, 1], ['OBSERVACIONES:', 17, 2], ['RESPONSABLE RECEPCION:', 17, 2]
+            ]
+        };
+
+        /** Escribe "RÓTULO: valor" dentro de una fila; reduce la letra (hasta 4,5 pt) para que el valor quepa completo. */
+        function etqTextoFila(pdf, x, y, w, h, rotulo, valor, maxLineas) {
+            const pad = 3, ancho = w - pad * 2;
+            valor = String(valor || '').replace(/\s+/g, ' ').trim();
+            for (let tam = 6.5; tam >= 4.5; tam -= 0.25) {
+                pdf.setFont('helvetica', 'bold'); pdf.setFontSize(tam);
+                const wRot = pdf.getTextWidth(rotulo + ' ') + 1;
+                pdf.setFont('helvetica', 'normal');
+                // la primera línea comparte renglón con el rótulo; las demás usan todo el ancho
+                const palabras = valor.split(' ').filter(Boolean);
+                const lineas = [];
+                let actual = '', disp = ancho - wRot;
+                palabras.forEach(p => {
+                    const prueba = actual ? actual + ' ' + p : p;
+                    if (pdf.getTextWidth(prueba) <= disp) { actual = prueba; }
+                    else if (!actual) { actual = p; }      // palabra más larga que la línea: se deja y se reduce la letra
+                    else { lineas.push(actual); actual = p; disp = ancho; }
+                });
+                if (actual || !lineas.length) lineas.push(actual);
+                const cabe = lineas.length <= maxLineas &&
+                    lineas.every((l, i) => pdf.getTextWidth(l) <= (i === 0 ? ancho - wRot : ancho) + 0.01);
+                if (cabe || tam <= 4.5) {
+                    let ls = lineas;
+                    if (!cabe) {                              // último recurso: recorta con puntos suspensivos
+                        ls = lineas.slice(0, maxLineas);
+                        let u = ls[ls.length - 1];
+                        const lim = (ls.length === 1 ? ancho - wRot : ancho);
+                        while (u.length > 1 && pdf.getTextWidth(u + '…') > lim) u = u.slice(0, -1);
+                        ls[ls.length - 1] = u + '…';
+                    }
+                    const inter = tam * 1.15, bloque = ls.length * inter;
+                    let yb = y + (h - bloque) / 2 + tam * 0.88;
+                    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(tam); pdf.setTextColor(0, 0, 0);
+                    pdf.text(rotulo, x + pad, yb);
+                    pdf.setFont('helvetica', 'normal');
+                    ls.forEach((l, i) => { pdf.text(l, i === 0 ? x + pad + wRot : x + pad, yb); yb += inter; });
+                    return;
+                }
+            }
+        }
+
+        function etqDibujar(pdf, ox, oy, d, it) {
+            const N = ETQ.naranja, W = ETQ.w, cx = ox + W / 2;
+            // Tarjeta con borde redondeado (el encabezado la tapa por arriba)
+            pdf.setFillColor(255, 255, 255); pdf.setDrawColor(...N); pdf.setLineWidth(1.2);
+            pdf.roundedRect(ox + 0.6, oy + 18, W - 1.2, ETQ.h - 18.6, 16, 16, 'FD');
+
+            // Encabezado
+            pdf.setFillColor(...N); pdf.setDrawColor(...ETQ.naranjaOsc); pdf.setLineWidth(0.5);
+            pdf.roundedRect(ox + 0.3, oy + 0.3, W - 0.6, 25, 4, 4, 'FD');
+            pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(6.5);
+            ['SISTEMA DE GESTION DE LABORATORIO', 'LABORATORIO DE CALIBRACION', 'ETIQUETA DE EQUIPOS RECIBIDOS (IBC)']
+                .forEach((t, i) => pdf.text(t, cx, oy + 8.2 + i * 7.3, { align: 'center' }));
+
+            // Logo y cuadro con el número de recepción
+            pdf.addImage(ETQ_LOGO, 'PNG', ox + 10, oy + 30, 50, 23.6);
+            pdf.setFillColor(...N); pdf.setDrawColor(...ETQ.naranjaOsc); pdf.setLineWidth(0.4);
+            pdf.roundedRect(ox + 66, oy + 30, 94, 23, 4, 4, 'FD');
+            pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(6.5);
+            pdf.text('No. de Recepción:', ox + 113, oy + 30 + 9, { align: 'center' });
+            let tam = 8.5; const nro = String(d.nroRecepcion || '');
+            pdf.setFontSize(tam);
+            while (tam > 4.5 && pdf.getTextWidth(nro) > 88) { tam -= 0.25; pdf.setFontSize(tam); }
+            pdf.text(nro, ox + 113, oy + 30 + 18.5, { align: 'center' });
+
+            // Tabla de datos
+            const tx = ox + 10, tw = 150;
+            const equipo = [ETQ_EQUIPO, it.marca, it.modelo].map(s => String(s || '').trim()).filter(Boolean).join(' ');
+            const valores = [equipo, fechaTexto(d.fechaRecepcion), d.cliente, it.serial, d.observaciones, d.recibidoNombre];
+            let y = oy + 58;
+            pdf.setDrawColor(...N); pdf.setLineWidth(0.5); pdf.line(tx, y, tx + tw, y);
+            ETQ.filas.forEach(([rotulo, alto, maxL], i) => {
+                if (i % 2 === 1) { pdf.setFillColor(...ETQ.tinte); pdf.rect(tx, y, tw, alto, 'F'); }
+                etqTextoFila(pdf, tx, y, tw, alto, rotulo, valores[i], maxL);
+                y += alto;
+            });
+            pdf.setDrawColor(...N); pdf.setLineWidth(0.5); pdf.line(tx, y, tx + tw, y);
+
+            // Pie de la etiqueta
+            pdf.setTextColor(0, 0, 0); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(5.5);
+            pdf.text('Vigencia: 20-07-2026        Rev:00', cx, oy + 154.5, { align: 'center' });
+            pdf.text('Código: RO-SGL-7.4-ET-01', cx, oy + 162, { align: 'center' });
+        }
+
+        /** Arma un PDF A4 con una etiqueta por equipo cargado (12 por hoja, 3 columnas x 4 filas). */
+        function construirEtiquetasPDF() {
+            const d = recolectarDatos();
+            const equipos = d.itemsData.filter(it => (it.serial || it.marca || it.modelo || '').toString().trim());
+            if (!equipos.length) throw new Error('No hay equipos cargados: ingrese o busque una recepción con al menos un ítem (serial, marca o modelo).');
+            const { jsPDF } = window.jspdf;
+            const nombre = `RO-SGL-7.4-ET-01_${d.nroRecepcion || 'Recepcion'}.pdf`;
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
+            pdf.setProperties({ title: nombre.replace(/\.pdf$/i, ''), subject: 'RO-SGL-7.4-ET-01 Etiquetas de equipos recibidos', creator: 'RO-SGL-7.4-FT-01' });
+            const gapX = 8, gapY = 8, cols = 3, filas = 4;
+            const x0 = (595.28 - (cols * ETQ.w + (cols - 1) * gapX)) / 2;
+            const y0 = (841.89 - (filas * ETQ.h + (filas - 1) * gapY)) / 2;
+            equipos.forEach((it, n) => {
+                const pos = n % (cols * filas);
+                if (n > 0 && pos === 0) pdf.addPage('a4', 'portrait');
+                const c = pos % cols, f = Math.floor(pos / cols);
+                etqDibujar(pdf, x0 + c * (ETQ.w + gapX), y0 + f * (ETQ.h + gapY), d, it);
+            });
+            return { pdf, nombre };
+        }
+
+        /** Abre el cuadro de impresión del navegador con las etiquetas de la recepción cargada. */
+        async function imprimirEtiquetas() {
+            return tareaPDF('button[onclick="imprimirEtiquetas()"]', async () => {
+                const { pdf } = construirEtiquetasPDF();
+                const url = URL.createObjectURL(pdf.output('blob'));
+                const f = document.createElement('iframe');
+                f.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0';
+                f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { window.open(url, '_blank'); } };
+                f.src = url; document.body.appendChild(f);
+                setTimeout(() => { URL.revokeObjectURL(url); f.remove(); }, 5 * 60 * 1000);
+            });
+        }
+        </script>
+</body>
+</html>

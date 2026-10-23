@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RO-SGL-7.4-FT-09 | Registro de Salida de Items</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- ExcelJS CDN: escribe sobre la plantilla conservando estilos y fórmulas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+    <!-- jsPDF: dibuja el PDF directamente desde la hoja de Excel generada -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+        .cond-select {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.15rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+        }
+        .cond-OK { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+        .cond-NC { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+        .cond-RG { background-color: #fef3c7; color: #b45309; border: 1px solid #fde047; }
+        .cond-NT { background-color: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db; }
+        .cond-NA { background-color: #e5e7eb; color: #6b7280; border: 1px solid #9ca3af; }
+
+        /* ---------- Responsive: tabla de ítems ----------
+           La tabla tiene 19 columnas; en celular no se puede mostrar entera
+           sin desplazamiento horizontal. Se fija un ancho mínimo y se deja
+           que el contenedor haga scroll-x, con la columna "Ítem" y el
+           encabezado fijos para no perder la referencia al desplazarse. */
+        .tabla-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+        }
+        .tabla-scroll table { min-width: 1150px; border: none; }
+        .tabla-scroll thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        /* Un elemento "sticky" debe traer su propio color de fondo: el que
+           pinta la fila (tr) no siempre se conserva al fijarlo. */
+        .tabla-scroll thead tr:nth-child(1) th { background-color: #1e293b; }
+        .tabla-scroll thead tr:nth-child(2) th { background-color: #334155; }
+        .tabla-scroll th:first-child,
+        .tabla-scroll td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 1;
+        }
+        .tabla-scroll thead th:first-child { z-index: 3; }
+        .tabla-scroll td:first-child { background-color: #f1f5f9; }
+
+        @media print {
+            .tabla-scroll { overflow: visible; border: none; }
+            .tabla-scroll table { min-width: 0; }
+            .tabla-scroll th:first-child,
+            .tabla-scroll td:first-child,
+            .tabla-scroll thead th { position: static; }
+        }
+
+        @media (max-width: 640px) {
+            input[type="text"], input[type="date"], input[type="time"],
+            textarea, select:not(.cond-select) {
+                font-size: 16px; /* evita el zoom automático de Safari/iOS al enfocar */
+            }
+        }
+
+        @media print {
+            @page {
+                size: landscape;
+                margin: 5mm;
+            }
+            body {
+                background-color: #fff;
+                color: #000;
+                font-size: 9pt;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+            }
+            .print-table th, .print-table td {
+                border: 1px solid #000 !important;
+                padding: 2px 4px !important;
+                font-size: 8pt !important;
+            }
+        }
+    </style>
+</head>
+<body class="p-3 md:p-6 text-slate-800">
+<div class="max-w-[1200px] mx-auto bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+
+  <div class="no-print bg-slate-900 text-white p-4 flex flex-wrap justify-between items-center gap-3 border-b border-slate-800">
+    <div class="flex items-center gap-3">
+      <div class="bg-amber-500 text-slate-950 p-2.5 rounded-lg font-bold"><i class="fa-solid fa-truck-ramp-box text-xl"></i></div>
+      <div>
+        <h1 class="font-bold text-lg leading-tight">Sistema de Gestión de Laboratorio (SGL)</h1>
+        <p class="text-xs text-slate-400">Registro de Salida de Items | <span class="text-amber-400 font-mono">RO-SGL-7.4-FT-09</span></p>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button onclick="nuevoFormulario()" class="bg-slate-700 hover:bg-slate-600 text-xs text-white px-3 py-2 rounded-lg transition flex items-center gap-1.5 font-medium"><i class="fa-solid fa-file-circle-plus"></i> Nuevo</button>
+      <button onclick="abrirBuscadorSalidas()" title="Buscar una salida guardada" class="bg-slate-700 hover:bg-slate-600 text-xs text-sky-300 px-3 py-2 rounded-lg transition flex items-center gap-1.5 font-medium"><i class="fa-solid fa-magnifying-glass"></i> Buscar Salida</button>
+      <button onclick="seleccionarPlantilla()" title="La plantilla oficial ya viene incluida" class="bg-slate-700 hover:bg-slate-600 text-xs text-white px-3 py-2 rounded-lg transition flex items-center gap-1.5 font-medium"><i class="fa-solid fa-table-list text-emerald-400"></i> Cambiar Plantilla</button>
+      <input type="file" id="inputPlantilla" accept=".xlsx" class="hidden">
+      <button onclick="guardarSalida()" id="btnGuardar" title="Registra la salida en la base de datos y avanza el correlativo" class="bg-amber-500 hover:bg-amber-400 text-xs text-slate-950 px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 font-semibold shadow"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+      <button onclick="exportarExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-xs text-white px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 font-semibold shadow"><i class="fa-solid fa-file-excel"></i> Exportar Excel</button>
+      <button onclick="exportarPDF()" class="bg-blue-600 hover:bg-blue-500 text-xs text-white px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 font-semibold shadow"><i class="fa-solid fa-file-pdf"></i> Exportar PDF</button>
+      <button onclick="imprimirPDF()" class="bg-slate-600 hover:bg-slate-500 text-xs text-white px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 font-semibold shadow"><i class="fa-solid fa-print"></i> Imprimir</button>
+    </div>
+  </div>
+
+  <!-- Importar desde recepción -->
+  <div class="no-print p-4 bg-amber-50 border-b border-amber-200">
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="font-bold text-sm text-amber-900"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Llenar desde una recepción</div>
+      <button onclick="abrirBuscador()" title="Buscar una recepción guardada por su número" class="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5"><i class="fa-solid fa-magnifying-glass text-sky-400"></i> Buscar recepción</button>
+      <button onclick="document.getElementById('inputRecepciones').click()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5"><i class="fa-solid fa-file-import"></i> Cargar Excel(s) de recepción</button>
+      <button onclick="importarBorrador()" class="bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5"><i class="fa-solid fa-floppy-disk"></i> Desde borrador de recepción</button>
+      <input type="file" id="inputRecepciones" accept=".xlsx" multiple class="hidden">
+      <label class="inline-flex items-center gap-1.5 text-xs text-amber-900 font-medium cursor-pointer"><input type="checkbox" id="agrupar" checked> Agrupar equipos iguales (marca + modelo)</label>
+    </div>
+    <p id="msgImport" class="text-xs text-amber-800 mt-2"></p>
+  </div>
+
+  <!-- Cabecera -->
+  <div class="p-4 bg-white border-b border-slate-200">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+      <div><label class="block font-bold text-slate-700 mb-1">Registro de Salida Nro.:</label>
+        <input type="text" id="nroSalida" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono font-semibold text-slate-900"></div>
+      <div><label class="block font-bold text-slate-700 mb-1">Fecha:</label>
+        <input type="date" id="fecha" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold"></div>
+      <div class="md:col-span-2"><label class="block font-bold text-slate-700 mb-1">No. Recepción:</label>
+        <input type="text" id="nroRecepcion" placeholder="ej. LB-2026-1401 (varias: sepárelas con  / )" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono font-semibold"></div>
+      <div class="md:col-span-2"><label class="block font-bold text-slate-700 mb-1">Cliente / Destino:</label>
+        <input type="text" id="cliente" placeholder="Nombre de la empresa o destino" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold"></div>
+      <div class="md:col-span-2"><label class="block font-bold text-slate-700 mb-1">Responsable:</label>
+        <input type="text" id="responsable" placeholder="Si se deja vacío, se usa el Cliente / Destino" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"></div>
+    </div>
+  </div>
+
+  <!-- Ítems -->
+  <div class="p-4">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
+      <h2 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-list-check text-amber-500 mr-1"></i> Ítems que salen <span id="contador" class="ml-1 text-xs font-medium text-slate-500"></span></h2>
+      <button onclick="agregarFila()" class="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center gap-1.5 self-start"><i class="fa-solid fa-plus"></i> Agregar fila</button>
+    </div>
+    <div id="listaItems" class="space-y-2"></div>
+  </div>
+
+  <div class="px-4 pb-4">
+    <label class="block font-bold text-slate-700 mb-1 text-xs">Observaciones:</label>
+    <textarea id="observaciones" rows="2" class="w-full p-2 border border-slate-300 rounded text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+  </div>
+
+  <div class="p-4 bg-slate-50 border-t border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+    <div><label class="block font-bold text-slate-700 mb-1">Elaborado por</label><input type="text" id="elaborado" class="w-full p-2 border border-slate-300 rounded"></div>
+    <div><label class="block font-bold text-slate-700 mb-1">Aprobado por</label><input type="text" id="aprobado" class="w-full p-2 border border-slate-300 rounded"></div>
+    <div><label class="block font-bold text-slate-700 mb-1">Recibido por</label><input type="text" id="recibido" placeholder="Vacío = Responsable" class="w-full p-2 border border-slate-300 rounded"></div>
+  </div>
+</div>
+
+<!-- MODAL DE BÚSQUEDA (Firebase) — mismo formato que RO-SGL-7.4-FT-01 -->
+<div id="modalBuscar" class="no-print hidden fixed inset-0 z-50 bg-slate-900/60 flex items-start justify-center p-3 pt-16" onclick="if(event.target===this)cerrarBuscador()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl border border-slate-200">
+        <div class="flex items-center justify-between p-3 border-b border-slate-200">
+            <h3 class="font-bold text-sm text-slate-800 flex items-center gap-2"><i class="fa-solid fa-magnifying-glass text-sky-600"></i> Buscar recepción guardada</h3>
+            <button onclick="cerrarBuscador()" class="text-slate-400 hover:text-slate-700 px-2"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form class="p-3 flex gap-2" onsubmit="event.preventDefault(); ejecutarBusqueda();">
+            <input type="text" id="buscarNro" placeholder="Nro. de recepción, cliente, equipo o serial. Vacío = las más recientes (busca en las últimas 1000)" class="flex-1 p-2 border border-slate-300 rounded text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none" style="font-size:16px">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 rounded">Buscar</button>
+        </form>
+        <div id="resultadosBusqueda" class="px-3 pb-3 max-h-[60vh] overflow-y-auto text-xs"></div>
+    </div>
+</div>
+<!-- MODAL: buscar salidas guardadas -->
+<div id="modalSalidas" class="no-print hidden fixed inset-0 z-50 bg-slate-900/60 flex items-start justify-center p-3 pt-16" onclick="if(event.target===this)cerrarBuscadorSalidas()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl border border-slate-200">
+        <div class="flex items-center justify-between p-3 border-b border-slate-200">
+            <h3 class="font-bold text-sm text-slate-800 flex items-center gap-2"><i class="fa-solid fa-magnifying-glass text-sky-600"></i> Buscar salida guardada</h3>
+            <button onclick="cerrarBuscadorSalidas()" class="text-slate-400 hover:text-slate-700 px-2"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form class="p-3 flex gap-2" onsubmit="event.preventDefault(); ejecutarBusquedaSalidas();">
+            <input type="text" id="buscarSalida" placeholder="Nro. de salida, cliente, recepción, equipo o serial. Vacío = las más recientes" class="flex-1 p-2 border border-slate-300 rounded text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" style="font-size:16px">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 rounded">Buscar</button>
+        </form>
+        <p class="px-3 pb-2 text-[11px] text-slate-400">Busca entre las últimas 1000 salidas guardadas.</p>
+        <div id="resultadosSalidas" class="px-3 pb-3 max-h-[60vh] overflow-y-auto text-xs"></div>
+    </div>
+</div>
+<div id="toast" class="no-print hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-lg shadow-lg text-xs font-semibold text-white max-w-[90vw]"></div>
+
+<script>
+        const NOMBRE_HOJA = 'Registro de Salida';
+        const ANCHO_POR_DEFECTO = 9;
+        const CLAVE_BORRADOR = 'RO_SGL_7_4_FT_09_borrador';
+        const CLAVE_CORRELATIVO = 'RO_SGL_7_4_FT_09_correlativo';
+        const CLAVE_RECEPCION = 'RO_SGL_7_4_FT_01_borrador';
+        const ULTIMO_CONOCIDO = 539;           // último Nro. de Salida visto en la plantilla (00539)
+        /* Filas de ítems: la plantilla trae 13 (filas 20-32). Cada página se arma con las filas que
+           necesita: mínimo FILAS_MIN, máximo FILA_MAX; si hay más ítems se crea otra página.
+           PRESUPUESTO_ALTO (pt) evita páginas absurdamente altas cuando las filas llevan muchos seriales.
+           Para volver al aspecto anterior (siempre 13 filas con casillas vacías) use FILAS_MIN = 13. */
+        const FILA_INI = 20, FILAS_PLANTILLA = 13, FILAS_MIN = 1, FILA_MAX = 14, PRESUPUESTO_ALTO = 600;
+        const CAMPOS = ['nroSalida','fecha','nroRecepcion','cliente','responsable','observaciones','elaborado','aprobado','recibido'];
+        let plantillaBuffer = null;
+        let items = [];
+
+        /* ---------- Correlativo ---------- */
+        function ultimoUsado() { try { return JSON.parse(localStorage.getItem(CLAVE_CORRELATIVO)).ultimo; } catch { return ULTIMO_CONOCIDO; } }
+        function proponerCorrelativo() { return String(ultimoUsado() + 1).padStart(5, '0'); }
+        const numSalida = () => parseInt(val('nroSalida').replace(/\D/g, ''), 10) || 0;
+        const fmtSalida = n => String(n).padStart(5, '0');
+        function guardarUltimo(n) { try { localStorage.setItem(CLAVE_CORRELATIVO, JSON.stringify({ ultimo: n })); } catch {} }
+        function confirmarCorrelativo() {
+            const n = numSalida();
+            if (n && n > ultimoUsado()) guardarUltimo(n);
+        }
+
+        /* ---------- Correlativo compartido (Firebase: /salidas/<00541>) ----------
+           El número emitido se registra en la base de datos al exportar. Así el siguiente
+           número no depende del navegador/equipo: se toma el mayor entre el local y el remoto. */
+        const FB_URL = 'https://laboratorio-64b0f-default-rtdb.firebaseio.com';
+        const FB_SALIDAS = 'salidas';
+        async function fbSalidas(ruta, opc = {}) {
+            const r = await fetch(`${FB_URL}/${FB_SALIDAS}${ruta}.json`, opc);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        }
+        /** Trae el mayor número emitido en Firebase y lo adopta si supera al local. Devuelve el último conocido. */
+        async function sincronizarCorrelativoRemoto() {
+            try {
+                const q = '?orderBy=' + encodeURIComponent('"$key"') + '&limitToLast=1';
+                const r = await fetch(`${FB_URL}/${FB_SALIDAS}.json${q}`);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const datos = await r.json();
+                const n = parseInt(Object.keys(datos || {})[0], 10);
+                if (Number.isFinite(n) && n > ultimoUsado()) guardarUltimo(n);
+            } catch { /* sin conexión o sin permisos: se sigue con el correlativo local */ }
+            return ultimoUsado();
+        }
+        /** Antes de exportar: si el número ya lo emitió otra salida distinta, se ofrece el siguiente libre. */
+        async function asegurarNumeroLibre() {
+            let n = numSalida();
+            if (!n) return true;
+            try {
+                const ultimo = await sincronizarCorrelativoRemoto();
+                const previa = await fbSalidas('/' + fmtSalida(n));
+                const mismaSalida = previa && String(previa.nroRecepcion || '') === val('nroRecepcion') && String(previa.cliente || '') === val('cliente');
+                if (previa && !mismaSalida) {
+                    const sig = fmtSalida(Math.max(ultimo, n) + 1);
+                    if (!confirm(`El Nro. de salida ${fmtSalida(n)} ya fue emitido` + (previa.cliente ? ` (${previa.cliente})` : '') + `.\n¿Usar el siguiente número disponible (${sig})?`)) return false;
+                    document.getElementById('nroSalida').value = sig; guardarAuto();
+                }
+            } catch { /* sin conexión: se continúa con el número actual */ }
+            return true;
+        }
+        /* ---------- Buscar salidas guardadas ---------- */
+        const sinTildes = t => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        const LIMITE_BUSQUEDA = 1000;   // cuántas de las últimas salidas / recepciones se revisan al buscar
+        let salidasCache = {};
+        function abrirBuscadorSalidas() {
+            document.getElementById('modalSalidas').classList.remove('hidden');
+            const inp = document.getElementById('buscarSalida'); inp.value = ''; inp.focus();
+            ejecutarBusquedaSalidas();
+        }
+        function cerrarBuscadorSalidas() { document.getElementById('modalSalidas').classList.add('hidden'); }
+
+        async function ejecutarBusquedaSalidas() {
+            const cont = document.getElementById('resultadosSalidas');
+            const q = sinTildes(document.getElementById('buscarSalida').value.trim());
+            cont.innerHTML = '<p class="text-slate-500 p-2"><i class="fa-solid fa-spinner fa-spin"></i> Buscando…</p>';
+            try {
+                // Se traen las últimas 1000 salidas y se filtra aquí: permite buscar por cualquier dato, no solo por número.
+                const r = await fetch(`${FB_URL}/${FB_SALIDAS}.json?orderBy=${encodeURIComponent('"$key"')}&limitToLast=${LIMITE_BUSQUEDA}`);
+                if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'Firebase rechazó el acceso. Revise las reglas de la base de datos.' : 'Error HTTP ' + r.status);
+                salidasCache = (await r.json()) || {};
+                const claves = Object.keys(salidasCache).sort().reverse().filter(k => {
+                    if (!q) return true;
+                    const d = salidasCache[k] || {};
+                    const lista = Array.isArray(d.items) ? d.items : Object.values(d.items || {});
+                    const texto = sinTildes([k, d.nroSalida, d.cliente, d.nroRecepcion, d.responsable, d.observaciones,
+                        ...lista.map(i => [i.equipo, i.marca, i.modelo, i.serial, i.obs].join(' '))].join(' '));
+                    return texto.includes(q) || (/^\d+$/.test(q) && k.replace(/^0+/, '').startsWith(q.replace(/^0+/, '')));
+                });
+                cont.innerHTML = '';
+                if (!claves.length) { cont.innerHTML = '<p class="text-slate-500 p-2">No se encontraron salidas.</p>'; return; }
+                claves.slice(0, 30).forEach(k => {
+                    const d = salidasCache[k] || {};
+                    const lista = Array.isArray(d.items) ? d.items : Object.values(d.items || {});
+                    const equipos = lista.reduce((t, i) => t + (parseInt(i.cant) || 0), 0);
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'w-full text-left p-2 mb-1 border border-slate-200 rounded hover:bg-blue-50 hover:border-blue-300 transition';
+                    const l1 = document.createElement('div'); l1.className = 'font-mono font-bold text-slate-800'; l1.textContent = 'Salida ' + (d.nroSalida || k);
+                    const l2 = document.createElement('div'); l2.className = 'text-slate-500';
+                    l2.textContent = [d.cliente || 'Sin cliente', d.nroRecepcion, d.fecha ? fechaTexto(d.fecha) : '', equipos ? equipos + ' equipo(s)' : ''].filter(Boolean).join('  ·  ');
+                    b.append(l1, l2);
+                    b.addEventListener('click', () => cargarSalida(k));
+                    cont.appendChild(b);
+                });
+                if (claves.length > 30) { const p = document.createElement('p'); p.className = 'text-slate-400 p-2'; p.textContent = `Se muestran 30 de ${claves.length}. Afine la búsqueda para ver otras.`; cont.appendChild(p); }
+            } catch (e) {
+                cont.innerHTML = ''; const p = document.createElement('p'); p.className = 'text-red-600 p-2'; p.textContent = 'Error en la búsqueda: ' + e.message; cont.appendChild(p);
+            }
+        }
+
+        function cargarSalida(k) {
+            const d = salidasCache[k];
+            if (!d) return avisar('No se pudo cargar la salida.', 'error');
+            const lista = Array.isArray(d.items) ? d.items : Object.values(d.items || {});
+            aplicar({ ...d, items: lista.map(i => ({ ...filaVacia(), ...i })) });   // Firebase descarta vacíos: se completan los campos
+            guardarAuto();
+            cerrarBuscadorSalidas();
+            avisar(`Salida ${d.nroSalida || k} cargada.`);
+        }
+
+        /** Registra la salida en Firebase. Lanza error si no se pudo. */
+        async function registrarSalidaRemota() {
+            const n = numSalida();
+            await fbSalidas('/' + fmtSalida(n), { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...estado(), formulario: 'RO-SGL-7.4-FT-09', guardadoEn: new Date().toISOString() }) });
+        }
+
+        /** Botón Guardar: es lo único que registra la salida y hace avanzar el correlativo. Exportar no lo hace. */
+        async function guardarSalida() {
+            if (!numSalida()) return avisar('Escriba el Nro. de salida antes de guardar.', 'error');
+            if (!items.some(r => r.equipo || r.marca || r.modelo || r.serial)) return avisar('Agregue al menos un equipo antes de guardar.', 'error');
+            const btn = document.getElementById('btnGuardar'), html = btn.innerHTML;
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando…';
+            try {
+                if (!(await asegurarNumeroLibre())) return;
+                const n = numSalida();
+                let remoto = true;
+                try { await registrarSalidaRemota(); } catch (err) { remoto = false; }
+                confirmarCorrelativo();                      // el siguiente "Nuevo" propone n + 1
+                guardarAuto();
+                if (remoto) avisar(`Salida ${fmtSalida(n)} guardada. La próxima será la ${fmtSalida(n + 1)}.`);
+                else avisar(`Salida ${fmtSalida(n)} guardada solo en este equipo: no se pudo conectar con la base de datos.`, 'error');
+            } finally { btn.disabled = false; btn.innerHTML = html; }
+        }
+        const hoyISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+
+        /* ---------- Estado / borrador ---------- */
+        function estado() { const e = { items }; CAMPOS.forEach(c => e[c] = document.getElementById(c).value); return e; }
+        let tGuardar;
+        function guardarAuto() { clearTimeout(tGuardar); tGuardar = setTimeout(() => { try { localStorage.setItem(CLAVE_BORRADOR, JSON.stringify(estado())); } catch {} }, 400); }
+        function aplicar(e) { if (typeof cargadas !== 'undefined') cargadas.clear(); CAMPOS.forEach(c => document.getElementById(c).value = e[c] ?? ''); items = e.items?.length ? e.items : [filaVacia()]; renderItems(); }
+        const filaVacia = () => ({ cant: '', equipo: '', marca: '', modelo: '', serial: '', obs: '' });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            let e = null;
+            try { e = JSON.parse(localStorage.getItem(CLAVE_BORRADOR)); } catch {}
+            if (e) aplicar(e); else nuevoFormulario(true);
+            // Otro equipo pudo emitir números nuevos: si el borrador quedó con un número ya emitido, se avanza al siguiente.
+            const previo = ultimoUsado();
+            sincronizarCorrelativoRemoto().then(ult => {
+                const n = numSalida();
+                if (ult > previo && n && n <= ult) { document.getElementById('nroSalida').value = fmtSalida(ult + 1); guardarAuto(); }
+            });
+            document.addEventListener('input', guardarAuto);
+            document.getElementById('inputRecepciones').addEventListener('change', async ev => {
+                const files = [...ev.target.files]; ev.target.value = '';
+                if (files.length) await importarExcel(files);
+            });
+        });
+
+        async function nuevoFormulario(silencioso) {
+            if (silencioso !== true && !confirm('¿Desea limpiar el formulario actual?')) return;
+            await sincronizarCorrelativoRemoto();          // toma el último número emitido en cualquier equipo
+            aplicar({ nroSalida: proponerCorrelativo(), fecha: hoyISO(), elaborado: 'Elian Martínez', aprobado: 'Zoraida Zapata', items: [filaVacia()] });
+            guardarAuto();
+        }
+
+        /* ---------- Ítems (tarjetas responsivas) ---------- */
+        const escapeHtml = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        function renderItems() {
+            const cls = 'w-full p-2 border border-slate-300 rounded text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white';
+            const lab = t => `<span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-0.5">${t}</span>`;
+            document.getElementById('listaItems').innerHTML = items.map((r, i) => `
+              <div class="grid grid-cols-2 md:grid-cols-12 gap-2 items-start bg-slate-50 border border-slate-200 rounded-lg p-3">
+                <div class="md:col-span-1">${lab('Cant.')}<input type="number" min="0" value="${escapeHtml(r.cant)}" oninput="items[${i}].cant=this.value" class="${cls} text-center font-semibold"></div>
+                <div class="md:col-span-2">${lab('Equipo')}<input type="text" value="${escapeHtml(r.equipo)}" oninput="items[${i}].equipo=this.value" class="${cls}"></div>
+                <div class="md:col-span-2">${lab('Marca')}<input type="text" value="${escapeHtml(r.marca)}" oninput="items[${i}].marca=this.value" class="${cls}"></div>
+                <div class="md:col-span-2">${lab('Modelo')}<input type="text" value="${escapeHtml(r.modelo)}" oninput="items[${i}].modelo=this.value" class="${cls}"></div>
+                <div class="col-span-2 md:col-span-2">${lab('Serial (uno por línea)')}<textarea rows="2" oninput="items[${i}].serial=this.value" class="${cls} font-mono">${escapeHtml(r.serial)}</textarea></div>
+                <div class="col-span-2 md:col-span-2">${lab('Observaciones (una por línea)')}<textarea rows="2" oninput="items[${i}].obs=this.value" class="${cls} font-mono">${escapeHtml(r.obs)}</textarea></div>
+                <div class="col-span-2 md:col-span-1 flex md:justify-end md:pt-4"><button onclick="eliminarFila(${i})" title="Eliminar fila" class="text-red-600 hover:bg-red-50 border border-red-200 rounded px-3 py-2 text-xs w-full md:w-auto"><i class="fa-solid fa-trash"></i></button></div>
+              </div>`).join('');
+            const n = items.filter(r => r.equipo || r.marca || r.modelo || r.serial).length;
+            document.getElementById('contador').textContent = `(${n} fila${n === 1 ? '' : 's'})`;
+        }
+        function agregarFila() { items.push(filaVacia()); renderItems(); guardarAuto(); }
+        function eliminarFila(i) { items.splice(i, 1); if (!items.length) items.push(filaVacia()); renderItems(); guardarAuto(); }
+
+        /* ---------- Importar desde una recepción ---------- */
+        const txt = c => { const v = c.value; if (v == null) return ''; if (typeof v === 'object') return String(v.richText ? v.richText.map(t => t.text).join('') : (v.result ?? v.text ?? '')).trim(); return String(v).trim(); };
+        const claveEq = r => [r.equipo, r.marca, r.modelo].map(s => s.trim().toUpperCase()).join('|');
+
+        function agregarEquipos(lista) {
+            if (items.length === 1 && !items[0].equipo && !items[0].marca && !items[0].modelo && !items[0].serial) items = [];
+            const agrupar = document.getElementById('agrupar').checked;
+            lista.forEach(e => {
+                const ex = agrupar ? items.find(r => claveEq(r) === claveEq(e)) : null;
+                if (ex) { ex.cant = (parseInt(ex.cant) || 0) + 1; ex.serial = [ex.serial, e.serial].filter(Boolean).join('\n'); }
+                else items.push({ cant: 1, equipo: e.equipo, marca: e.marca, modelo: e.modelo, serial: e.serial, obs: '' });
+            });
+            renderItems(); guardarAuto();
+        }
+        function registrarRecepcion(nro, cliente) {
+            const inp = document.getElementById('nroRecepcion');
+            const actuales = inp.value.split('/').map(s => s.trim()).filter(Boolean);
+            if (nro && !actuales.includes(nro)) inp.value = [...actuales, nro].join(' / ');
+            if (cliente && !val('cliente')) document.getElementById('cliente').value = cliente;
+        }
+        const nombreEquipo = tipo => tipo === 'U' ? 'Detector Monogas' : 'Detector Multigas';
+        function msg(t, ok = true) { const m = document.getElementById('msgImport'); m.textContent = t; m.className = 'text-xs mt-2 font-semibold ' + (ok ? 'text-emerald-700' : 'text-red-700'); }
+
+        async function importarExcel(files) {
+            let total = 0, recs = [];
+            try {
+                for (const f of files) {
+                    const wb = new ExcelJS.Workbook();
+                    await wb.xlsx.load(await f.arrayBuffer());
+                    wb.worksheets.forEach(ws => {
+                        const lista = [];
+                        for (let i = 0; i < 7; i++) {
+                            const b = 11 + i * 4;
+                            const serial = txt(ws.getCell('B' + b)), marca = txt(ws.getCell('C' + b)), modelo = txt(ws.getCell('D' + b));
+                            if (!serial && !marca && !modelo) continue;
+                            lista.push({ equipo: nombreEquipo(txt(ws.getCell('E' + b)).toUpperCase()), marca, modelo, serial });
+                        }
+                        if (!lista.length) return;
+                        const nro = txt(ws.getCell('C6'));
+                        registrarRecepcion(nro, txt(ws.getCell('N6')));
+                        if (nro && !recs.includes(nro)) recs.push(nro);
+                        agregarEquipos(lista); total += lista.length;
+                    });
+                }
+            } catch (e) { return msg('No se pudo leer el archivo: ' + e.message, false); }
+            if (!total) return msg('No se encontraron ítems. Use el Excel exportado del formulario de recepción FT-01.', false);
+            msg(`Se importaron ${total} equipo(s) de la recepción ${recs.join(', ') || '—'}. Complete los códigos de certificado en Observaciones.`);
+        }
+
+        function importarBorrador() {
+            let b = null;
+            try { b = JSON.parse(localStorage.getItem(CLAVE_RECEPCION)); } catch {}
+            if (!b || !b.itemsData?.length) return msg('No hay un borrador de recepción guardado en este navegador. Use "Cargar Excel(s) de recepción".', false);
+            registrarRecepcion((b.nroRecepcion || '').trim(), (b.cliente || '').trim());
+            const lista = b.itemsData.filter(r => r.serial || r.marca || r.modelo)
+                .map(r => ({ equipo: nombreEquipo(String(r.tipo).toUpperCase()), marca: r.marca || '', modelo: r.modelo || '', serial: r.serial || '' }));
+            agregarEquipos(lista);
+            msg(`Se importaron ${lista.length} equipo(s) del borrador de la recepción ${b.nroRecepcion || '—'}.`);
+        }
+
+        /* ---------- Firebase Realtime Database (API REST, sin SDK) ----------
+           Mismo esquema que RO-SGL-7.4-FT-01: cada recepción vive en
+           /recepciones/<NRO_EN_MAYÚSCULAS> y la búsqueda es por prefijo de la clave. */
+        const FIREBASE_DB_URL = 'https://laboratorio-64b0f-default-rtdb.firebaseio.com';
+        /* Cada formulario de recepción guarda en su propio nodo y con sus propios códigos de tipo. */
+        const FUENTES = [
+            { nodo: 'recepciones',            form: 'FT-01', etiqueta: 'Gases',     color: 'bg-amber-100 text-amber-800',
+              equipo: t => nombreEquipo(t) },                                               // M = multigas, U = monogas
+            { nodo: 'recepciones_presion',    form: 'FT-02', etiqueta: 'Presión',   color: 'bg-sky-100 text-sky-800',
+              equipo: t => t === 'D' ? 'Manómetro Digital' : 'Manómetro Analógico' },       // A / D
+            { nodo: 'recepciones_electricas', form: 'FT-03', etiqueta: 'Eléctricos', color: 'bg-violet-100 text-violet-800',
+              equipo: t => ({ PA: 'Pinza Amperimétrica', MT: 'Multímetro', ME: 'Meghómetro', TE: 'Telurómetro' }[t] || 'Instrumento Eléctrico') }
+        ];
+        const cargadas = new Set();   // "nodo|clave" de las recepciones ya traídas a este formulario
+
+        function claveRecepcion(nro) {
+            return String(nro || '').trim().toUpperCase().replace(/[.$#\[\]\/\s]+/g, '_');
+        }
+
+        async function fbRequest(ruta, { params = '' } = {}) {
+            let res;
+            try { res = await fetch(`${FIREBASE_DB_URL}/${ruta}.json${params}`); }
+            catch { throw new Error('Sin conexión con Firebase. Revise su internet.'); }
+            if (!res.ok) {
+                let m = '';
+                try { m = (await res.json()).error || ''; } catch { /* sin cuerpo JSON */ }
+                if (res.status === 401 || res.status === 403) throw new Error('Firebase rechazó el acceso a /' + ruta.split('/')[0] + ' (' + (m || res.status) + '). Revise las reglas de la base de datos.');
+                throw new Error(m || ('Error HTTP ' + res.status));
+            }
+            return res.json();
+        }
+
+        let toastTimer = null;
+        function avisar(mensaje, tipo = 'ok') {
+            const t = document.getElementById('toast');
+            t.textContent = mensaje;
+            t.className = 'no-print fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-lg shadow-lg text-xs font-semibold text-white max-w-[90vw] '
+                        + (tipo === 'error' ? 'bg-red-600' : 'bg-emerald-600');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => t.classList.add('hidden'), tipo === 'error' ? 7000 : 3500);
+        }
+
+        function fechaTexto(iso) { const [a, m, d] = String(iso).split('-'); return (a && m && d) ? `${d}/${m}/${a}` : String(iso); }
+
+        function abrirBuscador() {
+            document.getElementById('modalBuscar').classList.remove('hidden');
+            const inp = document.getElementById('buscarNro');
+            inp.value = '';
+            inp.focus();
+            ejecutarBusqueda();
+        }
+        function cerrarBuscador() { document.getElementById('modalBuscar').classList.add('hidden'); }
+
+        async function ejecutarBusqueda() {
+            const cont = document.getElementById('resultadosBusqueda');
+            const q = sinTildes(document.getElementById('buscarNro').value.trim());
+            const qClave = claveRecepcion(q).toLowerCase();
+            cont.innerHTML = '<p class="text-slate-500 p-2"><i class="fa-solid fa-spinner fa-spin"></i> Buscando…</p>';
+            // Se traen las últimas LIMITE_BUSQUEDA (1000) recepciones de cada formulario y se filtra aquí:
+            // así se puede buscar por número, cliente, equipo, serial, etc., no solo por el prefijo del número.
+            const params = `?orderBy=${encodeURIComponent('"$key"')}&limitToLast=${LIMITE_BUSQUEDA}`;
+            // Se consultan los tres nodos a la vez; si uno falla, se muestran los demás y se avisa del error.
+            const resp = await Promise.allSettled(FUENTES.map(f => fbRequest(f.nodo, { params })));
+            const todas = [], errores = [];
+            const textoPlano = v => v == null ? '' : (typeof v === 'object' ? Object.values(v).map(textoPlano).join(' ') : String(v));
+            resp.forEach((r, i) => {
+                if (r.status === 'rejected') { errores.push(`${FUENTES[i].etiqueta} (${FUENTES[i].form}): ${r.reason.message}`); return; }
+                Object.entries(r.value || {}).forEach(([clave, d]) => {
+                    d = d || {};
+                    if (q && !sinTildes(clave + ' ' + textoPlano(d)).includes(q) && !(qClave && clave.toLowerCase().includes(qClave))) return;
+                    todas.push({ fuente: FUENTES[i], clave, d });
+                });
+            });
+            // Las más recientes primero
+            todas.sort((a, b) => String(b.d.guardadoEn || '').localeCompare(String(a.d.guardadoEn || '')) || b.clave.localeCompare(a.clave));
+            const MOSTRAR = 30, filas = todas.slice(0, MOSTRAR);
+            cont.innerHTML = '';
+            if (!filas.length && !errores.length) cont.innerHTML = '<p class="text-slate-500 p-2">No se encontraron recepciones entre las últimas ' + LIMITE_BUSQUEDA + ' de cada formulario.</p>';
+            filas.forEach(({ fuente, clave, d }) => {
+                const nItems = Array.isArray(d.itemsData) ? d.itemsData.length : Object.keys(d.itemsData || {}).length;
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'w-full text-left p-2 mb-1 border border-slate-200 rounded hover:bg-blue-50 hover:border-blue-300 transition';
+                const l1 = document.createElement('div');
+                l1.className = 'flex items-center gap-2 font-mono font-bold text-slate-800';
+                const num = document.createElement('span'); num.textContent = d.nroRecepcion || clave;
+                const tag = document.createElement('span');
+                tag.className = 'px-1.5 py-0.5 rounded text-[10px] font-semibold font-sans ' + fuente.color;
+                tag.textContent = `${fuente.etiqueta} · ${fuente.form}`;
+                l1.append(num, tag);
+                const l2 = document.createElement('div');
+                l2.className = 'text-slate-500';
+                l2.textContent = [d.cliente || 'Sin cliente', d.fechaRecepcion ? fechaTexto(d.fechaRecepcion) : '', nItems + ' ítem(s)'].filter(Boolean).join('  ·  ');
+                b.append(l1, l2);
+                b.addEventListener('click', () => cargarRecepcion(fuente, clave));
+                cont.appendChild(b);
+            });
+            if (todas.length > MOSTRAR) {
+                const p = document.createElement('p'); p.className = 'text-slate-400 p-2';
+                p.textContent = `Se muestran ${MOSTRAR} de ${todas.length}. Afine la búsqueda para ver otras.`;
+                cont.appendChild(p);
+            }
+            errores.forEach(t => {
+                const p = document.createElement('p');
+                p.className = 'text-red-600 p-2';
+                p.textContent = 'Error en la búsqueda · ' + t;
+                cont.appendChild(p);
+            });
+        }
+
+        async function cargarRecepcion(fuente, clave) {
+            try {
+                const d = await fbRequest(`${fuente.nodo}/${clave}`);
+                if (!d) { avisar('La recepción ya no existe.', 'error'); return; }
+                const nro = String(d.nroRecepcion || clave).trim();
+                const id = fuente.nodo + '|' + clave;
+                if (cargadas.has(id)) { avisar(`La recepción ${nro} (${fuente.etiqueta}) ya está cargada en este formulario.`, 'error'); return; }
+                if (val('nroRecepcion').split('/').map(x => x.trim()).includes(nro) &&
+                    !confirm(`El número ${nro} ya figura en este formulario.\n¿Agregar también los equipos de ${fuente.etiqueta} (${fuente.form})?`)) return;
+                // Firebase puede devolver objetos en vez de arreglos: se normaliza.
+                const crudo = Array.isArray(d.itemsData) ? d.itemsData : Object.values(d.itemsData || {});
+                const lista = crudo.filter(r => r && (r.serial || r.marca || r.modelo)).map(r => ({
+                    equipo: fuente.equipo(String(r.tipo || '').toUpperCase()),
+                    marca: r.marca || '', modelo: r.modelo || '', serial: r.serial || ''
+                }));
+                if (!lista.length) { avisar(`La recepción ${nro} no tiene equipos registrados.`, 'error'); return; }
+                cargadas.add(id);
+                registrarRecepcion(nro, String(d.cliente || '').trim());
+                agregarEquipos(lista);
+                cerrarBuscador();
+                msg(`Recepción ${nro} (${fuente.etiqueta}) cargada desde la base de datos: ${lista.length} equipo(s). Complete los códigos de certificado en Observaciones.`);
+                avisar(`Recepción ${nro} cargada.`);
+            } catch (e) {
+                avisar('No se pudo cargar: ' + e.message, 'error');
+            }
+        }
+
+        /* ---------- Utilidades de Excel ---------- */
+        const val = id => (document.getElementById(id)?.value ?? '').trim();
+        function celdaDestino(ws, ref) { const c = ws.getCell(ref); return (c.isMerged && c.master) ? c.master : c; }
+        function escribir(ws, ref, valor) {
+            const c = celdaDestino(ws, ref);
+            if (c.value && typeof c.value === 'object' && 'formula' in c.value) return;
+            c.value = (valor === '' || valor === undefined) ? null : valor;
+        }
+        const forzar = (ws, ref, valor) => { celdaDestino(ws, ref).value = valor || null; };
+
+        const PLANTILLA_BASE64 = "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";
+        function clonarHoja(wb, origen, nombre, nFilas) {
+            const destino = wb.addWorksheet(nombre, {
+                pageSetup:  JSON.parse(JSON.stringify(origen.pageSetup  || {})),
+                properties: JSON.parse(JSON.stringify(origen.properties || {})),
+                views:      JSON.parse(JSON.stringify(origen.views      || []))
+            });
+
+            const columnas = origen.columnCount;
+            const delta = nFilas - FILAS_PLANTILLA;                 // cuánto se desplazan las filas posteriores a los ítems
+            const ULT_ITEM_PLANTILLA = FILA_INI + FILAS_PLANTILLA - 1;
+            const totalDestino = origen.rowCount + delta;
+            const esItem = d => d >= FILA_INI && d < FILA_INI + nFilas;
+            // Fila de la plantilla de la que se copia el formato: primera, intermedias y última de los ítems conservan sus bordes.
+            const filaOrigen = d => {
+                if (d < FILA_INI) return d;
+                if (esItem(d)) return d === FILA_INI ? FILA_INI : (d === FILA_INI + nFilas - 1 ? ULT_ITEM_PLANTILLA : FILA_INI + 4);
+                return d - delta;
+            };
+
+            // 1) Anchos de columna
+            for (let c = 1; c <= columnas; c++) {
+                const col = origen.getColumn(c);
+                if (col.width)  destino.getColumn(c).width  = col.width;
+                if (col.hidden) destino.getColumn(c).hidden = true;
+            }
+            aplicarAnchosFijos(destino);
+
+            // 2) Combinaciones (antes que los estilos): las de los ítems se repiten en cada fila creada;
+            //    las de debajo (observaciones, firmas) se desplazan.
+            (origen.model.merges || []).forEach(m => {
+                const x = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(m);
+                if (!x) return;
+                const r1 = +x[2], r2 = +x[4];
+                try {
+                    if (r2 < FILA_INI) destino.mergeCells(m);
+                    else if (r1 > ULT_ITEM_PLANTILLA) destino.mergeCells(`${x[1]}${r1 + delta}:${x[3]}${r2 + delta}`);
+                    else if (r1 === FILA_INI && r2 === FILA_INI)
+                        for (let d = FILA_INI; d < FILA_INI + nFilas; d++) destino.mergeCells(`${x[1]}${d}:${x[3]}${d}`);
+                } catch (e) {}
+            });
+
+            // 3) Alturas, estilos y textos fijos de la plantilla (los ítems de ejemplo no se copian)
+            for (let d = 1; d <= totalDestino; d++) {
+                const fo = origen.getRow(filaOrigen(d)), fd = destino.getRow(d);
+                if (esItem(d)) fd.height = 26.25;
+                else if (fo.height) fd.height = fo.height;
+                for (let c = 1; c <= columnas; c++) {
+                    const co = fo.getCell(c), cd = fd.getCell(c);
+                    if (co.style) cd.style = JSON.parse(JSON.stringify(co.style));
+                    if (esItem(d)) continue;
+                    if (cd.isMerged && cd.master !== cd) continue;   // el valor vive en la maestra
+                    const v = co.value;
+                    if (v && typeof v === 'object' && v.formula) cd.value = { formula: v.formula };
+                    else if (v !== null && v !== undefined)       cd.value = v;
+                }
+            }
+            if (destino.pageSetup.printArea) destino.pageSetup.printArea = `A2:U${38 + delta}`;
+
+            // 4) Imágenes embebidas (el logo), con la misma posición y tamaño.
+            (origen.getImages() || []).forEach(img => {
+                try {
+                    const media   = wb.getImage(img.imageId);
+                    const nuevoId = wb.addImage({ buffer: media.buffer, extension: media.extension });
+                    destino.addImage(nuevoId, {
+                        tl: { nativeCol: img.range.tl.nativeCol, nativeColOff: img.range.tl.nativeColOff || 0, nativeRow: img.range.tl.nativeRow, nativeRowOff: img.range.tl.nativeRowOff || 0 },
+                        br: { nativeCol: img.range.br.nativeCol, nativeColOff: img.range.br.nativeColOff || 0, nativeRow: img.range.br.nativeRow, nativeRowOff: img.range.br.nativeRowOff || 0 },
+                        editAs: img.range.editAs
+                    });
+                } catch (e) { /* si la plantilla no trae imagen, se omite sin romper la copia */ }
+            });
+
+            return destino;
+        }
+
+        function aplicarAnchosFijos(ws) {
+            ws.properties = ws.properties || {};
+            ws.properties.defaultColWidth = ANCHO_POR_DEFECTO;
+        }
+
+        /** Decodifica el base64 incrustado a un ArrayBuffer, tal como lo
+            necesita ExcelJS. No depende de Buffer de Node (no existe en el
+            navegador), solo de atob(), disponible en cualquier navegador. */
+        function base64ABuffer(base64) {
+            const binario = atob(base64);
+            const bytes = new Uint8Array(binario.length);
+            for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+            return bytes.buffer;
+        }
+
+        async function obtenerPlantilla() {
+            if (plantillaBuffer) return plantillaBuffer;
+            try {
+                plantillaBuffer = base64ABuffer(PLANTILLA_BASE64);
+                return plantillaBuffer;
+            } catch (e) {
+                // Solo debería llegar aquí si el base64 incrustado se corrompió
+                // al editar el archivo a mano; se ofrece elegir el .xlsx a mano.
+                return await pedirPlantillaAlUsuario();
+            }
+        }
+
+        function pedirPlantillaAlUsuario() {
+            return new Promise((resolve, reject) => {
+                const input = document.getElementById('inputPlantilla');
+                const onChange = async () => {
+                    input.removeEventListener('change', onChange);
+                    const f = input.files[0];
+                    input.value = '';
+                    if (!f) return reject(new Error('No se seleccionó ningún archivo .xlsx'));
+                    plantillaBuffer = await f.arrayBuffer();
+                    resolve(plantillaBuffer);
+                };
+                input.addEventListener('change', onChange);
+                input.click();
+            });
+        }
+
+        /** Botón "Cargar Plantilla": permite probar otra plantilla distinta a
+            la incrustada, sin tocar el código, solo para la sesión actual
+            (se pierde al recargar la página). */
+        async function seleccionarPlantilla() {
+            plantillaBuffer = null;
+            try {
+                await pedirPlantillaAlUsuario();
+                alert('Plantilla cargada para esta sesión. Ya puede exportar.');
+            } catch (e) { /* cancelado por el usuario */ }
+        }
+
+
+        /* =====================================================================
+           EXPORTAR A PDF CON EL FORMATO EXACTO DE LA PLANTILLA
+           ---------------------------------------------------------------------
+           El botón "Imprimir / PDF" ya no imprime el formulario web (que tiene
+           su propio diseño en Tailwind): genera un PDF a partir del MISMO libro
+           de Excel que produce "Exportar Excel" (armarLibroDesdeFormulario),
+           reconstruyendo cada hoja como una tabla HTML con los bordes, colores,
+           fuentes y celdas combinadas leídos directamente de la plantilla, y
+           la rasteriza con html2canvas + jsPDF. El PDF resultante reproduce la
+           plantilla tal cual está, sin pasar por el diseño de la página web.
+           (ACTUALIZADO: ahora el PDF es vectorial: se dibuja con jsPDF directamente
+           desde el libro de Excel, con las mismas medidas que usa Excel al imprimir.)
+           ===================================================================== */
+
+        /* Paleta del tema "Office" por defecto. Solo se usa cuando una celda
+           referencia un color por número de tema (fill.fgColor.theme, etc.)
+           en lugar de un color directo (argb). Es la paleta estándar que trae
+           cualquier libro nuevo de Excel salvo que el autor haya cambiado el
+           tema del documento. */
+        const TEMA_OFFICE = ['FFFFFF', '000000', 'E7E6E6', '44546A',
+                              '4472C4', 'ED7D31', 'A5A5A5', 'FFC000', '5B9BD5', '70AD47'];
+
+        function aplicarTinte(hex, tint) {
+            const c = [0, 2, 4].map(i => parseInt(hex.substr(i, 2), 16));
+            const ajustado = c.map(v => tint < 0 ? v * (1 + tint) : v + (255 - v) * tint);
+            return '#' + ajustado.map(v => Math.max(0, Math.min(255, Math.round(v)))
+                                              .toString(16).padStart(2, '0')).join('');
+        }
+
+        /** Convierte un color de ExcelJS (argb directo, tema+tinte, o índice
+            de la paleta heredada) a un color CSS. `paraRelleno` decide qué
+            devolver cuando el color es "automático" (índice 64): nada para
+            relleno (transparente) y negro para texto o bordes. */
+        function colorCss(colorObj, paraRelleno = false) {
+            if (!colorObj) return paraRelleno ? null : '#000000';
+            if (colorObj.argb) return '#' + colorObj.argb.slice(2);
+            if (colorObj.theme !== undefined) {
+                const base = TEMA_OFFICE[colorObj.theme] || '000000';
+                return aplicarTinte(base, colorObj.tint || 0);
+            }
+            if (colorObj.indexed !== undefined) {
+                if (colorObj.indexed === 64) return paraRelleno ? null : '#000000'; // auto
+                if (colorObj.indexed === 65) return '#ffffff';
+                return '#000000';
+            }
+            return paraRelleno ? null : '#000000';
+        }
+
+        /** Convierte un buffer binario (ArrayBuffer/Uint8Array) a base64,
+            sin depender de Buffer de Node (no existe en el navegador). */
+        function bufferABase64(buffer) {
+            const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+            let binario = '';
+            const bloque = 0x8000;
+            for (let i = 0; i < bytes.length; i += bloque) {
+                binario += String.fromCharCode.apply(null, bytes.subarray(i, i + bloque));
+            }
+            return btoa(binario);
+        }
+
+        /* =====================================================================
+           PDF VECTORIAL DESDE LA HOJA DE EXCEL
+           Cada hoja del libro se dibuja con jsPDF usando las mismas medidas que
+           Excel: ancho de columna (px = ancho x 7), alto de fila en puntos,
+           celdas combinadas, rellenos, bordes, alineación vertical (por defecto
+           abajo, como Excel), saltos de línea y área de impresión. Se escala solo
+           hacia abajo para caber en la página y se centra horizontalmente.
+           ===================================================================== */
+        const PX_A_PT = 0.75;
+        const letrasANum = t => [...t].reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0);
+        const rgbDeCss = css => { const h = String(css || '#000000').replace('#', ''); return [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16) || 0); };
+
+        function anchoColPt(ws, c) {
+            const col = ws.getColumn(c);
+            if (col.hidden) return 0;
+            const w = col.width || (ws.properties && ws.properties.defaultColWidth) || 8.43;
+            return Math.round(w * 7) * PX_A_PT;
+        }
+        function altoFilaPt(ws, r) {
+            const fila = ws.getRow(r);
+            if (fila.hidden) return 0;
+            return fila.height || (ws.properties && ws.properties.defaultRowHeight) || 15;
+        }
+        function rangoImpresion(ws) {
+            const pa = ws.pageSetup && ws.pageSetup.printArea;
+            const m = pa && /\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)/.exec(String(pa));
+            if (m) return { c1: letrasANum(m[1]), r1: +m[2], c2: letrasANum(m[3]), r2: +m[4] };
+            return { c1: 1, r1: 1, c2: Math.min(ws.columnCount || 21, 21), r2: ws.rowCount };
+        }
+        function mapaCombinaciones(ws) {
+            const ancla = {}, cubierta = {};
+            (ws.model.merges || []).forEach(rg => {
+                const m = /^\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)$/.exec(rg);
+                if (!m) return;
+                const o = { c1: letrasANum(m[1]), r1: +m[2], c2: letrasANum(m[3]), r2: +m[4] };
+                ancla[o.r1 + ':' + o.c1] = o;
+                for (let r = o.r1; r <= o.r2; r++) for (let c = o.c1; c <= o.c2; c++)
+                    if (r !== o.r1 || c !== o.c1) cubierta[r + ':' + c] = o;
+            });
+            return { ancla, cubierta };
+        }
+
+        /* ---- fuentes ---- */
+        function estiloFuente(f) {
+            f = f || {};
+            return { name: f.name || 'Arial', size: f.size || 10, bold: !!f.bold, italic: !!f.italic, underline: !!f.underline,
+                     color: f.color ? colorCss(f.color) : '#000000' };
+        }
+        function estiloRun(f, base) {          // en el texto con formato mixto cada tramo define su propio estilo
+            if (!f) return base;
+            return { name: f.name || base.name, size: f.size || base.size, bold: !!f.bold, italic: !!f.italic,
+                     underline: !!f.underline, color: f.color ? colorCss(f.color) : base.color };
+        }
+        function fuentePdf(est) {
+            const n = String(est.name || '').toLowerCase();
+            const fam = /times|georgia|garamond|cambria/.test(n) ? 'times' : /courier|consolas|mono/.test(n) ? 'courier' : 'helvetica';
+            return [fam, est.bold ? (est.italic ? 'bolditalic' : 'bold') : (est.italic ? 'italic' : 'normal')];
+        }
+        /** Calibri no viene en los PDF estándar y es ~13% más angosta que Helvetica: se reduce el tamaño para
+            que el texto ocupe el mismo ancho que en Excel (si no, se corta o salta de línea de más). */
+        function tamPdf(est) {
+            return est.size * (/calibri|carlito/i.test(est.name || '') ? (est.bold ? 0.85 : 0.89) : 1);
+        }
+        const cacheAnchoTexto = {};
+        function medirTexto(pdf, t, est) {
+            const [fam, sty] = fuentePdf(est);
+            const k = fam + sty + tamPdf(est) + '|' + t;
+            if (cacheAnchoTexto[k] === undefined) { pdf.setFont(fam, sty); pdf.setFontSize(tamPdf(est)); cacheAnchoTexto[k] = pdf.getTextWidth(t); }
+            return cacheAnchoTexto[k];
+        }
+
+        /** Parte el texto en líneas (respeta \n y, si hay ajuste de texto, parte por palabras o por letras). */
+        function disponerLineas(pdf, segs, ancho, ajustar, tamBase) {
+            const parrafos = [[]];
+            segs.forEach(sg => {
+                String(sg.t).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/\u00a0/g, ' ').split(/\r?\n/).forEach((trozo, i) => {
+                    if (i > 0) parrafos.push([]);
+                    trozo.split(/(\s+)/).forEach(tok => { if (tok !== '') parrafos[parrafos.length - 1].push({ t: tok, est: sg.est, esp: /^\s+$/.test(tok) }); });
+                });
+            });
+            const lineas = [];
+            parrafos.forEach(par => {
+                let ln = { p: [], w: 0 };
+                const cerrar = () => {
+                    while (ln.p.length && ln.p[ln.p.length - 1].esp) ln.w -= ln.p.pop().w;
+                    ln.size = ln.p.length ? Math.max(...ln.p.map(x => x.est.size)) : tamBase;
+                    lineas.push(ln); ln = { p: [], w: 0 };
+                };
+                par.forEach(tok0 => {
+                    let tok = tok0, w = medirTexto(pdf, tok.t, tok.est);
+                    if (ajustar) {
+                        if (tok.esp && !ln.p.length) return;                         // sin espacios al inicio de línea
+                        if (!tok.esp && ln.p.length && ln.w + w > ancho + 0.01) cerrar();
+                        while (!tok.esp && w > ancho + 0.01 && tok.t.length > 1) {   // palabra más ancha que la celda
+                            let n = tok.t.length - 1;
+                            while (n > 1 && medirTexto(pdf, tok.t.slice(0, n), tok.est) > ancho) n--;
+                            const cab = { t: tok.t.slice(0, n), est: tok.est, esp: false };
+                            cab.w = medirTexto(pdf, cab.t, cab.est); ln.p.push(cab); ln.w += cab.w; cerrar();
+                            tok = { t: tok.t.slice(n), est: tok.est, esp: false }; w = medirTexto(pdf, tok.t, tok.est);
+                        }
+                    }
+                    ln.p.push({ t: tok.t, est: tok.est, esp: tok.esp, w }); ln.w += w;
+                });
+                cerrar();
+            });
+            return lineas;
+        }
+        function recortarLinea(pdf, ln, maxW) {
+            if (ln.w <= maxW + 0.01) return ln;
+            const out = { p: [], w: 0, size: ln.size };
+            for (const pz of ln.p) {
+                if (out.w + pz.w <= maxW) { out.p.push(pz); out.w += pz.w; continue; }
+                let n = pz.t.length;
+                while (n > 0 && out.w + medirTexto(pdf, pz.t.slice(0, n), pz.est) > maxW) n--;
+                if (n > 0) { const t = pz.t.slice(0, n), w = medirTexto(pdf, t, pz.est); out.p.push({ t, est: pz.est, esp: pz.esp, w }); out.w += w; }
+                break;
+            }
+            return out;
+        }
+
+        /* ---- bordes ---- */
+        function propsBorde(b) {
+            if (!b || !b.style) return null;
+            const ancho = { hair: 0.35, thin: 0.6, dotted: 0.6, dashed: 0.6, dashDot: 0.6, dashDotDot: 0.6, medium: 1.2, mediumDashed: 1.2,
+                            mediumDashDot: 1.2, mediumDashDotDot: 1.2, slantDashDot: 1.2, double: 1.2, thick: 1.9 }[b.style] || 0.6;
+            const dash = b.style === 'dotted' ? [0.6, 1.2] : /dash/i.test(b.style) ? [3, 1.5] : null;
+            return { w: ancho, dash, color: colorCss(b.color) || '#000000' };
+        }
+
+        /** Convierte un PNG a JPEG sobre fondo blanco (solo si jsPDF no pudo leer el PNG). */
+        function pngAJpeg(dataUrl) {
+            return new Promise((resolve, reject) => {
+                const im = new Image();
+                im.onload = () => {
+                    const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+                    const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(im, 0, 0);
+                    resolve(cv.toDataURL('image/jpeg', 0.95));
+                };
+                im.onerror = reject; im.src = dataUrl;
+            });
+        }
+
+        async function dibujarHoja(pdf, ws, wb) {
+            const rg = rangoImpresion(ws), { ancla, cubierta } = mapaCombinaciones(ws);
+            // Geometría de la hoja en puntos (sin escala)
+            const colX = {}, rowY = {};
+            let acc = 0; for (let c = rg.c1; c <= rg.c2; c++) { colX[c] = acc; acc += anchoColPt(ws, c); } colX[rg.c2 + 1] = acc; const totW = acc;
+            acc = 0; for (let r = rg.r1; r <= rg.r2; r++) { rowY[r] = acc; acc += altoFilaPt(ws, r); } rowY[rg.r2 + 1] = acc; const totH = acc;
+            // Página: se escala solo hacia abajo (como "ajustar a 1 página") y se centra en horizontal
+            const PW = pdf.internal.pageSize.getWidth(), PH = pdf.internal.pageSize.getHeight();
+            const mg = (ws.pageSetup && ws.pageSetup.margins) || {};
+            const ml = (mg.left ?? 0.2) * 72, mr = (mg.right ?? 0.2) * 72, mt = (mg.top ?? 0.2) * 72, mb = (mg.bottom ?? 0.2) * 72;
+            const s = Math.min(1, (PW - ml - mr) / totW, (PH - mt - mb) / totH);
+            const x0 = ml + ((PW - ml - mr) - totW * s) / 2, y0 = mt;
+            const X = v => x0 + v * s, Y = v => y0 + v * s;
+            const rectDe = o => {
+                const c2 = Math.min(o.c2, rg.c2), r2 = Math.min(o.r2, rg.r2);
+                return { x: colX[o.c1], y: rowY[o.r1], w: colX[c2 + 1] - colX[o.c1], h: rowY[r2 + 1] - rowY[o.r1] };
+            };
+            const celdaDe = (r, c) => ws.getRow(r).getCell(c);
+            const regiones = [];
+            for (let r = rg.r1; r <= rg.r2; r++) for (let c = rg.c1; c <= rg.c2; c++) {
+                const k = r + ':' + c;
+                if (cubierta[k]) continue;
+                regiones.push(ancla[k] || { c1: c, r1: r, c2: c, r2: r });
+            }
+
+            // 1) Rellenos
+            regiones.forEach(o => {
+                const rc = rectDe(o), fl = celdaDe(o.r1, o.c1).fill;
+                if (!fl || fl.type !== 'pattern' || fl.pattern !== 'solid') return;
+                const css = colorCss(fl.fgColor, true);
+                if (!css || css.toLowerCase() === '#ffffff') return;
+                pdf.setFillColor(...rgbDeCss(css));
+                pdf.rect(X(rc.x) - 0.2, Y(rc.y) - 0.2, rc.w * s + 0.4, rc.h * s + 0.4, 'F');
+            });
+
+            // 2) Imágenes (logo), con su posición exacta dentro de las celdas
+            for (const img of (ws.getImages() || [])) {
+                try {
+                    const media = wb.getImage(img.imageId), tl = img.range.tl, br = img.range.br;
+                    const posX = a => (colX[a.nativeCol + 1] ?? (a.nativeCol + 1 > rg.c2 ? totW : 0)) + (a.nativeColOff || 0) / 12700;
+                    const posY = a => (rowY[a.nativeRow + 1] ?? (a.nativeRow + 1 > rg.r2 ? totH : 0)) + (a.nativeRowOff || 0) / 12700;
+                    const ix = posX(tl), iy = posY(tl);
+                    const iw = br ? posX(br) - ix : (img.range.ext ? img.range.ext.width * PX_A_PT : 0);
+                    const ih = br ? posY(br) - iy : (img.range.ext ? img.range.ext.height * PX_A_PT : 0);
+                    if (iw <= 0 || ih <= 0) continue;
+                    const ext = String(media.extension || 'png').toLowerCase();
+                    let url = `data:image/${ext};base64,${bufferABase64(media.buffer)}`, fmt = /jpe?g/.test(ext) ? 'JPEG' : 'PNG';
+                    try { pdf.addImage(url, fmt, X(ix), Y(iy), iw * s, ih * s, undefined, 'FAST'); }
+                    catch (e) { url = await pngAJpeg(url); pdf.addImage(url, 'JPEG', X(ix), Y(iy), iw * s, ih * s); }
+                } catch (e) { /* una imagen que no se pueda leer no impide generar el PDF */ }
+            }
+
+            // 3) Textos
+            const vacia = (r, c) => {
+                const o = cubierta[r + ':' + c], cel = o ? celdaDe(o.r1, o.c1) : celdaDe(r, c);
+                try { return !String(cel.text ?? '').trim(); } catch (e) { return true; }
+            };
+            regiones.forEach(o => {
+                const cel = celdaDe(o.r1, o.c1), al = cel.alignment || {}, v = cel.value;
+                const base = estiloFuente(cel.font);
+                let segs;
+                if (v && typeof v === 'object' && Array.isArray(v.richText)) segs = v.richText.map(rn => ({ t: rn.text || '', est: estiloRun(rn.font, base) }));
+                else segs = [{ t: String(cel.text ?? ''), est: base }];
+                if (!segs.some(sg => String(sg.t).trim())) return;
+                const rc = rectDe(o);
+                const ajustar = !!al.wrapText;
+                const padH = 1.5 + (al.indent || 0) * 3, padV = 1;
+                const valor = (v && typeof v === 'object' && 'result' in v) ? v.result : v;
+                let h = al.horizontal;
+                if (!h || h === 'general') h = typeof valor === 'number' ? 'right' : 'left';
+                if (h === 'centerContinuous') h = 'center';
+                const vert = al.vertical === 'middle' ? 'center' : (al.vertical || 'bottom');
+                let lineas = disponerLineas(pdf, segs, rc.w - 2 * padH, ajustar, base.size);
+                const paso = ln => ln.size * 1.14;
+                const altoBloque = lineas.reduce((a, ln) => a + paso(ln), 0);
+                let yTop = vert === 'top' ? rc.y + padV : vert === 'center' ? rc.y + (rc.h - altoBloque) / 2 : rc.y + rc.h - padV - altoBloque;
+
+                // Texto sin ajuste: puede desbordar sobre celdas vecinas vacías (como en Excel)
+                let regIzq = rc.x + padH, regDer = rc.x + rc.w - padH;
+                if (!ajustar) {
+                    const maxW = Math.max(...lineas.map(l => l.w));
+                    if (maxW > regDer - regIzq) {
+                        let izq = 0, der = 0;
+                        if (o.c1 === o.c2) {   // solo las celdas sin combinar pueden desbordar sobre las vecinas vacías
+                            for (let c = o.c2 + 1; c <= rg.c2 && vacia(o.r1, c); c++) der += colX[c + 1] - colX[c];
+                            for (let c = o.c1 - 1; c >= rg.c1 && vacia(o.r1, c); c--) izq += colX[c + 1] - colX[c];
+                        }
+                        if (h === 'right') regIzq -= izq; else if (h === 'center') { const e = Math.min(izq, der); regIzq -= e; regDer += e; } else regDer += der;
+                        lineas = lineas.map(ln => recortarLinea(pdf, ln, regDer - regIzq + 4));
+                    }
+                }
+                lineas.forEach(ln => {
+                    const alto = paso(ln), top = yTop; yTop += alto;
+                    // Una línea que no cabe en la celda no se dibuja (Excel la recorta)
+                    if (top < rc.y - 0.2 * alto || top + alto > rc.y + rc.h + 0.2 * alto) return;
+                    const baseY = top + (alto - 1.117 * ln.size) / 2 + 0.905 * ln.size;
+                    let px = h === 'right' ? regDer - ln.w : h === 'center' ? (regIzq + regDer) / 2 - ln.w / 2 : regIzq;
+                    ln.p.forEach(pz => {
+                        if (!pz.esp) {
+                            const [fam, sty] = fuentePdf(pz.est);
+                            pdf.setFont(fam, sty); pdf.setFontSize(tamPdf(pz.est) * s);
+                            pdf.setTextColor(...rgbDeCss(pz.est.color));
+                            pdf.text(pz.t, X(px), Y(baseY), { baseline: 'alphabetic' });
+                            if (pz.est.underline) {
+                                pdf.setDrawColor(...rgbDeCss(pz.est.color)); pdf.setLineDashPattern([], 0);
+                                pdf.setLineWidth(Math.max(0.3, pz.est.size * 0.06 * s));
+                                pdf.line(X(px), Y(baseY + pz.est.size * 0.12), X(px + pz.w), Y(baseY + pz.est.size * 0.12));
+                            }
+                        }
+                        px += pz.w;
+                    });
+                });
+            });
+
+            // 4) Bordes (al final, encima de rellenos y textos). Las combinadas solo dibujan su contorno exterior.
+            const bordes = {};
+            const agregar = (b, x1, y1, x2, y2) => {
+                const pr = propsBorde(b); if (!pr) return;
+                bordes[[x1, y1, x2, y2, pr.w, pr.color, pr.dash].join('|')] = { ...pr, x1, y1, x2, y2 };
+            };
+            for (let r = rg.r1; r <= rg.r2; r++) for (let c = rg.c1; c <= rg.c2; c++) {
+                const k = r + ':' + c, mo = cubierta[k] || ancla[k] || null, bd = celdaDe(r, c).border || {};
+                const x1 = colX[c], x2 = colX[c + 1], y1 = rowY[r], y2 = rowY[r + 1];
+                if (!mo || r === mo.r1) agregar(bd.top, x1, y1, x2, y1);
+                if (!mo || r === mo.r2) agregar(bd.bottom, x1, y2, x2, y2);
+                if (!mo || c === mo.c1) agregar(bd.left, x1, y1, x1, y2);
+                if (!mo || c === mo.c2) agregar(bd.right, x2, y1, x2, y2);
+            }
+            Object.values(bordes).sort((a, b) => a.w - b.w).forEach(e => {
+                pdf.setDrawColor(...rgbDeCss(e.color));
+                pdf.setLineWidth(e.w * s);
+                if (e.dash) { pdf.setLineDashPattern(e.dash.map(d => d * s), 0); pdf.setLineCap(0); }
+                else { pdf.setLineDashPattern([], 0); pdf.setLineCap(2); }
+                pdf.line(X(e.x1), Y(e.y1), X(e.x2), Y(e.y2));
+            });
+            pdf.setLineDashPattern([], 0); pdf.setLineCap(0);
+        }
+
+        /** Arma el PDF completo (una página por hoja del libro de Excel). */
+        async function construirPDF() {
+            const libro = await armarLibro();
+            const { jsPDF } = window.jspdf;
+            const nombre = nombreArchivo('pdf');
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
+            pdf.setProperties({ title: nombre.replace(/\.pdf$/i, ''), subject: 'RO-SGL-7.4-FT-09 Registro de Salida de Items', creator: 'RO-SGL-7.4-FT-09' });
+            for (let i = 0; i < libro.hojas.length; i++) {
+                if (i > 0) pdf.addPage('a4', 'portrait');
+                await dibujarHoja(pdf, libro.hojas[i], libro.wb);
+            }
+            return { pdf, nombre };
+        }
+
+        /* ---------- Exportación sobre la plantilla FT-09 ---------- */
+        function alturaFila(r) {
+            const l = (t, w) => String(t || '').split('\n').reduce((a, s) => a + Math.max(1, Math.ceil(s.length / w)), 0);
+            return Math.max(26.25, Math.max(l(r.serial, 16), l(r.obs, 17), l(r.modelo, 14), l(r.equipo, 13), l(r.marca, 14)) * 12.5 + 4);
+        }
+        function paginar(filas) {
+            const pags = []; let cur = [], h = 0;
+            filas.forEach(r => {
+                const a = alturaFila(r);
+                if (cur.length && (cur.length >= FILA_MAX || h + a > PRESUPUESTO_ALTO)) { pags.push(cur); cur = []; h = 0; }
+                cur.push(r); h += a;
+            });
+            pags.push(cur);
+            return pags;
+        }
+        function llenarHoja(ws, lote, ultima, nFilas) {
+            const iso = val('fecha') || hoyISO();
+            escribir(ws, 'F8', val('nroSalida'));
+            escribir(ws, 'N8', +iso.slice(8, 10)); escribir(ws, 'R8', +iso.slice(5, 7)); escribir(ws, 'T8', +iso.slice(0, 4));
+            forzar(ws, 'T18', null);   // la plantilla trae un "2019" suelto en esta celda
+            escribir(ws, 'D12', val('nroRecepcion'));
+            escribir(ws, 'D13', val('cliente'));
+            const resp = val('responsable') || val('cliente');
+            if (val('responsable')) forzar(ws, 'D15', val('responsable'));
+            else celdaDestino(ws, 'D15').value = { formula: 'D13', result: val('cliente') };   // conserva la fórmula de la plantilla con su resultado (lo usa el PDF)
+            for (let i = 0; i < nFilas; i++) {
+                const r = lote[i], n = FILA_INI + i;
+                escribir(ws, 'A' + n, r && r.cant !== '' ? Number(r.cant) : null);
+                escribir(ws, 'B' + n, r?.equipo); escribir(ws, 'D' + n, r?.marca); escribir(ws, 'G' + n, r?.modelo);
+                escribir(ws, 'K' + n, r?.serial); escribir(ws, 'P' + n, r?.obs);
+                ws.getRow(n).height = r ? alturaFila(r) : 26.25;
+            }
+            // Observaciones y firmas solo en la última página
+            const fObs = FILA_INI + nFilas, fFirmas = fObs + 3;      // 33 y 36 cuando hay 13 filas
+            escribir(ws, 'D' + fObs, ultima ? val('observaciones') : '');
+            escribir(ws, 'A' + fFirmas, ultima ? val('elaborado') : '');
+            escribir(ws, 'F' + fFirmas, ultima ? val('aprobado') : '');
+            const celdaRecibido = 'L' + fFirmas;
+            if (!ultima) forzar(ws, celdaRecibido, null); else if (val('recibido')) forzar(ws, celdaRecibido, val('recibido')); else celdaDestino(ws, celdaRecibido).value = { formula: 'D15', result: resp };
+        }
+        async function armarLibro() {
+            const wb = new ExcelJS.Workbook();
+            await wb.xlsx.load(await obtenerPlantilla());
+            const hoja1 = wb.getWorksheet(NOMBRE_HOJA) || wb.worksheets[0];
+            if (!hoja1) throw new Error('La plantilla no contiene hojas.');
+            aplicarAnchosFijos(hoja1);
+            hoja1.pageSetup.fitToPage = true; hoja1.pageSetup.fitToWidth = 1; hoja1.pageSetup.fitToHeight = 1;
+            const filas = items.filter(r => r.equipo || r.marca || r.modelo || r.serial || r.obs);
+            const pags = paginar(filas);
+            // Cada página se crea con las filas que necesita (entre FILAS_MIN y FILA_MAX) a partir de la plantilla.
+            const nFilasPag = pags.map(lote => Math.min(FILA_MAX, Math.max(FILAS_MIN, lote.length)));
+            const hojas = pags.map((lote, p) => clonarHoja(wb, hoja1, `__pagina${p + 1}`, nFilasPag[p]));
+            wb.removeWorksheet(hoja1.id);                              // la hoja original de la plantilla ya no se usa
+            hojas.forEach((h, p) => { h.name = pags.length > 1 ? `Salida ${p + 1} de ${pags.length}` : NOMBRE_HOJA; });
+            pags.forEach((lote, p) => llenarHoja(hojas[p], lote, p === pags.length - 1, nFilasPag[p]));
+            wb.calcProperties = wb.calcProperties || {}; wb.calcProperties.fullCalcOnLoad = true;
+            return { wb, hojas };
+        }
+        /** Nombre del archivo exportado: "No <salida> <Cliente/Destino> <No. Recepción>" (ej. No 540 EMPRESA SA 1401). */
+        /** De "LB-2026-1401" deja solo el correlativo final "1401". Varias recepciones (separadas por /) se unen con "-". */
+        function correlativos(txt) {
+            return String(txt || '').split('/').map(x => x.trim()).filter(Boolean)
+                .map(x => { const m = x.match(/(\d+)\D*$/); return m ? m[1] : x.replace(/[\\:*?"<>|]+/g, '-'); }).join('-');
+        }
+        function nombreArchivo(ext) {
+            const nro = String(numSalida() || val('nroSalida') || 'Salida');
+            const limpiar = t => String(t || '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, '-').replace(/\s+/g, ' ').trim();
+            const partes = ['No ' + nro, limpiar(val('cliente')), correlativos(val('nroRecepcion'))].filter(Boolean);
+            return partes.join(' ').slice(0, 180) + '.' + ext;
+        }
+        async function exportarExcel() {
+            let libro;
+            try { libro = await armarLibro(); } catch (e) { return alert('No se pudo generar el Excel: ' + e.message); }
+            const out = await libro.wb.xlsx.writeBuffer();
+            const url = URL.createObjectURL(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+            const a = document.createElement('a'); a.href = url; a.download = nombreArchivo('xlsx');
+            document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+        }
+        let generandoPDF = false;
+        /** Ejecuta una acción de PDF mostrando "Generando..." en el botón y evitando dobles clics. */
+        async function tareaPDF(selector, accion) {
+            if (generandoPDF) return;
+            generandoPDF = true;
+            const btn = document.querySelector(selector);
+            const html = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.classList.add('opacity-60', 'cursor-wait'); btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generando...'; }
+            try { await accion(); }
+            catch (e) { alert('No se pudo generar el PDF: ' + (e && e.message ? e.message : e)); }
+            finally {
+                generandoPDF = false;
+                if (btn) { btn.disabled = false; btn.classList.remove('opacity-60', 'cursor-wait'); btn.innerHTML = html; }
+            }
+        }
+        async function exportarPDF() {
+            return tareaPDF('button[onclick="exportarPDF()"]', async () => {
+                const { pdf, nombre } = await construirPDF();
+                pdf.save(nombre);
+            });
+        }
+        /** Abre el cuadro de impresión del navegador con el mismo PDF (si el navegador lo bloquea, lo abre en otra pestaña). */
+        async function imprimirPDF() {
+            return tareaPDF('button[onclick="imprimirPDF()"]', async () => {
+                const { pdf } = await construirPDF();
+                const url = URL.createObjectURL(pdf.output('blob'));
+                const f = document.createElement('iframe');
+                f.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0';
+                f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { window.open(url, '_blank'); } };
+                f.src = url; document.body.appendChild(f);
+                setTimeout(() => { URL.revokeObjectURL(url); f.remove(); }, 5 * 60 * 1000);
+            });
+        }
+
+</script>
+</body>
+</html>
