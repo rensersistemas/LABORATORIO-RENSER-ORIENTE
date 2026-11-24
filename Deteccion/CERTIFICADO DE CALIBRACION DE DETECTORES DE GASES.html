@@ -2208,11 +2208,16 @@ async function traerRegistroFT03() {
       if (slot) {
         slot.activo = true;
         if (ve.res) slot.res = ve.res;
-        const p0 = lista(ve.p).find(x => String(x?.pat || '').trim() !== '') || lista(ve.p)[0];
-        if (p0) {
-          if (p0.pat) slot.vPat = p0.pat;
-          if (p0.a1)  slot.vAntes = p0.a1;
-          if (p0.d1)  slot.vDespues = p0.d1;
+        const puntos = lista(ve.p).filter(x => x != null);
+        const pMax = puntos.reduce((best, cur) => {
+          const bVal = parseFloat(best?.pat) || 0;
+          const cVal = parseFloat(cur?.pat) || 0;
+          return cVal > bVal ? cur : best;
+        }, puntos[0]) || puntos[0];
+        if (pMax) {
+          if (pMax.pat != null && String(pMax.pat).trim() !== '') slot.vPat = pMax.pat;
+          if (pMax.a1 != null && String(pMax.a1).trim() !== '')   slot.vAntes = pMax.a1;
+          if (pMax.d1 != null && String(pMax.d1).trim() !== '')   slot.vDespues = pMax.d1;
         }
       }
     });
@@ -2580,7 +2585,9 @@ async function armarLibroCertificado() {
   wsCert.getCell('D8').value = fmtFechaCert(d.fechaCalibracion);
   wsCert.getCell('N8').value = fmtFechaCert(d.proximaCalibracion);
   wsCert.getCell('D9').value = d.lugarCalibracion;
+  wsCert.getCell('A10').value = '';
   wsCert.getCell('D10').value = '';
+  wsCert.getRow(10).hidden = true;
   wsCert.getCell('D12').value = d.codigoCiss;
 
   wsCert.getCell('B17').value = d.cliente;
@@ -2668,7 +2675,10 @@ async function armarLibroCertificado() {
     slot.calcRows.forEach((rCalc, j) => {
       const rCert = slot.certResRows[j];
       const pt = (s.puntos || [])[j];
-      if (!pt) return;
+      if (!pt) {
+        wsCert.getRow(rCert).hidden = true;
+        return;
+      }
       const calc = calcularPunto(pt, s.res);
       const ocultarPunto = oculto || (pt.mostrar === false);
       wsCert.getRow(rCert).hidden = ocultarPunto;
@@ -2692,15 +2702,39 @@ async function armarLibroCertificado() {
         }
       }
 
-      if (j === 0) {
-        wsCert.getCell('B' + rCert).value = { formula: `A${slot.rowRange}`, result: s.label };
-      }
-      wsCert.getCell('D' + rCert).value = { formula: `'CALCULADORA DE INCERTIDUMBRE'!B${rCalc}`,  result: calc.valido ? calc.pat : 0 };
-      wsCert.getCell('F' + rCert).value = { formula: `'CALCULADORA DE INCERTIDUMBRE'!Y${rCalc}`,  result: calc.valido ? Number(calc.prom.toFixed(2)) : 0 };
-      wsCert.getCell('H' + rCert).value = { formula: `'CALCULADORA DE INCERTIDUMBRE'!Z${rCalc}`,  result: calc.valido ? Number(calc.err.toFixed(2)) : 0 };
-      wsCert.getCell('J' + rCert).value = { formula: `'CALCULADORA DE INCERTIDUMBRE'!D${rCalc}`,  result: calc.valido ? Number(calc.emp.toFixed(2)) : 0 };
-      wsCert.getCell('L' + rCert).value = { formula: `'CALCULADORA DE INCERTIDUMBRE'!AE${rCalc}`, result: calc.valido ? Number(calc.uExp.toFixed(2)) : 0 };
-      wsCert.getCell('N' + rCert).value = pt.conf || calc.confAuto || 'C';
+      const celB = wsCert.getCell('B' + rCert);
+      celB.value = { formula: `A${slot.rowRange}`, result: s.label };
+      celB._valFinal = s.label;
+
+      const valPatNum = num(pt.pat);
+      const valPat = !isNaN(valPatNum) ? valPatNum : String(pt.pat ?? '');
+      const valProm = calc.valido ? Number(calc.prom.toFixed(2)) : 0;
+      const valErr = calc.valido ? Number(calc.err.toFixed(2)) : 0;
+      const valEmpNum = num(pt.emp);
+      const valEmp = calc.valido ? Number(calc.emp.toFixed(2)) : (!isNaN(valEmpNum) ? Number(valEmpNum.toFixed(2)) : 0);
+      const valUExp = calc.valido ? Number(calc.uExp.toFixed(2)) : 0;
+      const valConf = pt.conf || calc.confAuto || 'C';
+
+      const celD = wsCert.getCell('D' + rCert);
+      const celF = wsCert.getCell('F' + rCert);
+      const celH = wsCert.getCell('H' + rCert);
+      const celJ = wsCert.getCell('J' + rCert);
+      const celL = wsCert.getCell('L' + rCert);
+      const celN = wsCert.getCell('N' + rCert);
+
+      celD.value = { formula: `'CALCULADORA DE INCERTIDUMBRE'!B${rCalc}`,  result: valPat };
+      celF.value = { formula: `'CALCULADORA DE INCERTIDUMBRE'!Y${rCalc}`,  result: valProm };
+      celH.value = { formula: `'CALCULADORA DE INCERTIDUMBRE'!Z${rCalc}`,  result: valErr };
+      celJ.value = { formula: `'CALCULADORA DE INCERTIDUMBRE'!D${rCalc}`,  result: valEmp };
+      celL.value = { formula: `'CALCULADORA DE INCERTIDUMBRE'!AE${rCalc}`, result: valUExp };
+      celN.value = valConf;
+
+      celD._valFinal = valPat;
+      celF._valFinal = valProm;
+      celH._valFinal = valErr;
+      celJ._valFinal = valEmp;
+      celL._valFinal = valUExp;
+      celN._valFinal = valConf;
     });
   });
 
@@ -2963,24 +2997,39 @@ async function dibujarPaginaCertificadoPDF(pdf, ws, listaFilas, numPagina, PW, P
     if (rc.w <= 0 || rc.h <= 0) return;
     const rFuente = o.rOrig1 || o.r1;
     if (rFuente === 27 && o.c1 === 15) return; // Ocultar marcador "FOTO" debajo de la imagen del equipo
+    if (rFuente === 10) return; // Ocultar fila 10 duplicada de la plantilla residual (Lugar de Calibración)
     const cel = celdaDe(rFuente, o.c1), al = cel.alignment || {}, v = cel.value;
     const fl = cel.fill;
     const fillCss = (fl && fl.type === 'pattern' && fl.pattern === 'solid') ? colorCss(fl.fgColor, true) : null;
     const base = estiloFuente(cel.font, fillCss);
 
     let texto = '';
-    if (v && typeof v === 'object') {
-      if ('result' in v) texto = v.result ?? '';
-      else if (Array.isArray(v.richText)) texto = v.richText.map(x => x.text || '').join('');
-      else texto = String(cel.text ?? '');
-    } else {
-      texto = v ?? '';
+    if (cel._valFinal !== undefined && cel._valFinal !== null) {
+      texto = cel._valFinal;
+    } else if (v !== null && v !== undefined) {
+      if (typeof v === 'object') {
+        if ('result' in v && v.result !== undefined && v.result !== null) {
+          texto = v.result;
+        } else if (Array.isArray(v.richText)) {
+          texto = v.richText.map(x => x.text || '').join('');
+        } else if (v.text !== undefined && v.text !== null) {
+          texto = v.text;
+        } else {
+          texto = cel.text ?? '';
+        }
+      } else {
+        texto = v;
+      }
     }
-    if (typeof texto === 'number' && rFuente >= 115 && rFuente <= 143 && o.c1 >= 6) {
-      texto = texto.toFixed(2);
+    if (typeof texto === 'number') {
+      if (rFuente >= 115 && rFuente <= 143 && o.c1 >= 6) {
+        texto = texto.toFixed(2);
+      } else {
+        texto = String(texto);
+      }
     }
-    texto = String(texto).trim();
-    if (!texto) return;
+    texto = String(texto ?? '').trim();
+    if (texto === '') return;
 
     const padH = 2.2, padV = 1.2;
     let h = al.horizontal;
@@ -3042,10 +3091,14 @@ async function dibujarPaginaCertificadoPDF(pdf, ws, listaFilas, numPagina, PW, P
       const mo = cubierta[k] || ancla[k] || null;
       const bd = celdaDe(r, c).border || {};
       const x1 = colX[c], x2 = colX[c + 1], y1 = rowY[r], y2 = rowY[r] + altoFilaPt(ws, r);
-      if (!mo || r === mo.r1) agregarBorde(bd.top, x1, y1, x2, y1);
-      if (!mo || r === mo.r2) agregarBorde(bd.bottom, x1, y2, x2, y2);
-      if (!mo || c === mo.c1) agregarBorde(bd.left, x1, y1, x1, y2);
-      if (!mo || c === mo.c2) agregarBorde(bd.right, x2, y1, x2, y2);
+      const bdTop = (mo && r === mo.r1 && r >= 115 && r <= 143) ? (bd.top || { style: 'thin', color: { argb: 'FF000000' } }) : bd.top;
+      const bdBottom = (mo && r === mo.r2 && r >= 115 && r <= 143) ? (bd.bottom || { style: 'thin', color: { argb: 'FF000000' } }) : bd.bottom;
+      const bdLeft = (mo && c === mo.c1 && r >= 115 && r <= 143) ? (bd.left || { style: 'thin', color: { argb: 'FF000000' } }) : bd.left;
+      const bdRight = (mo && c === mo.c2 && r >= 115 && r <= 143) ? (bd.right || { style: 'thin', color: { argb: 'FF000000' } }) : bd.right;
+      if (!mo || r === mo.r1) agregarBorde(bdTop, x1, y1, x2, y1);
+      if (!mo || r === mo.r2) agregarBorde(bdBottom, x1, y2, x2, y2);
+      if (!mo || c === mo.c1) agregarBorde(bdLeft, x1, y1, x1, y2);
+      if (!mo || c === mo.c2) agregarBorde(bdRight, x2, y1, x2, y2);
     }
   });
 
