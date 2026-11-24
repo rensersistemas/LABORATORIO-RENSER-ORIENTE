@@ -126,6 +126,12 @@
       </span>
     </div>
     <div class="no-print flex flex-wrap items-center gap-1.5 normal-case">
+      <button type="button" onclick="cargarGasesMultigas()" class="bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold px-2.5 py-1 rounded shadow-xs inline-flex items-center gap-1" title="Carga los 4 gases estándar: 1) H2S, 2) CO, 3) CH4, 4) O2 con sus alarmas y unidades">
+        <i class="fa-solid fa-list-ol"></i> Cargar 4 Gases (H2S, CO, CH4, O2)
+      </button>
+      <button type="button" onclick="ordenarComponentesTablas()" class="bg-slate-700 hover:bg-slate-600 text-amber-300 border border-slate-600 text-[11px] font-semibold px-2.5 py-1 rounded inline-flex items-center gap-1" title="Reordena los componentes actuales en las 3 tablas al orden oficial: 1) H2S, 2) CO, 3) CH4, 4) O2">
+        <i class="fa-solid fa-arrow-down-short-wide"></i> Reordenar (H2S, CO, CH4, O2)
+      </button>
       <button type="button" onclick="toggleTablaRefAlarmas()" class="bg-slate-700 hover:bg-slate-600 text-sky-300 border border-slate-600 text-[11px] font-semibold px-2.5 py-1 rounded inline-flex items-center gap-1" title="Ver tabla patrón de unidades y alarmas por componente">
         <i class="fa-solid fa-table-list"></i> Tabla de referencia
       </button>
@@ -167,8 +173,8 @@
     <div class="tabla-scroll"><table class="w-full border-collapse text-[11px]">
       <thead><tr><th class="border border-slate-400 p-1.5">Componente</th><th class="border border-slate-400">Unidad</th><th class="border border-slate-400">Alarma Baja</th><th class="border border-slate-400">Alarma Alta</th><th class="border border-slate-400">Alarma TWA</th><th class="border border-slate-400">Alarma STEL</th><th class="no-print border border-slate-400 w-9 text-center" title="Acción"><i class="fa-solid fa-gear text-[10px]"></i></th></tr></thead>
       <tbody id="tb-alarmas"></tbody></table></div>
-   <!--  <p class="no-print text-[10px] text-slate-500"><i class="fa-solid fa-lightbulb text-amber-500"></i> Al escribir o elegir un componente (<b>H2S, CO, CH4, O2, NH3, CO2</b>) se completan automáticamente su unidad y sus 4 niveles de alarma. Para <b>CH4</b> puedes elegir <b>%LEL</b> (10 / 20 / N/A / N/A) o <b>%VOL</b> (0,5 / 1 / N/A / N/A).</p>
- --> </div>
+    <p class="no-print text-[10px] text-slate-500"><i class="fa-solid fa-circle-check text-emerald-600"></i> Orden oficial de componentes: <b>1) H2S &nbsp;·&nbsp; 2) CO &nbsp;·&nbsp; 3) CH4 &nbsp;·&nbsp; 4) O2</b>. Al escribir o elegir un componente se completan automáticamente su unidad y sus 4 niveles de alarma.</p>
+  </div>
 
   <!-- CONDICIONES AMBIENTALES -->
   <div class="sec">Condiciones ambientales</div>
@@ -531,6 +537,99 @@ const CATALOGO_ALARMAS = [
   { clave: 'NH3',      comp: 'NH3', uni: 'PPM',   baja: '25',   alta: '35',    twa: 'N/A',  stel: 'N/A' },
   { clave: 'CO2',      comp: 'CO2', uni: 'PPM',   baja: '5000', alta: '10000', twa: '5000', stel: '30000' }
 ];
+
+/* ---------- Orden Oficial y Estandarización de Gases (H2S -> CO -> CH4 -> O2) ---------- */
+const ORDEN_OFICIAL_GASES = ['H2S', 'CO', 'CH4', 'O2'];
+
+function pesoOrdenGas(nombre) {
+  const c = String(nombre || '').trim().toUpperCase().replace(/\s+/g, '');
+  if (c === 'H2S' || c === 'H₂S') return 1;
+  if (c === 'CO') return 2;
+  if (c.startsWith('CH4') || c === 'LEL' || c === '%LEL') return 3;
+  if (c === 'O2' || c === 'O₂' || c === 'OXIGENO' || c === 'OXÍGENO') return 4;
+  if (c.startsWith('NH3') || c.startsWith('NH₃')) return 5;
+  if (c.startsWith('CO2') || c.startsWith('CO₂')) return 6;
+  if (c.startsWith('SO2') || c.startsWith('SO₂')) return 7;
+  return 100;
+}
+
+function ordenarListaGases(arr) {
+  return [...arr].sort((a, b) => {
+    const na = typeof a === 'string' ? a : (a?.comp || '');
+    const nb = typeof b === 'string' ? b : (b?.comp || '');
+    const pa = pesoOrdenGas(na);
+    const pb = pesoOrdenGas(nb);
+    if (pa !== pb) return pa - pb;
+    return 0;
+  });
+}
+
+function ordenarComponentesTablas(silencioso = false) {
+  const n = Math.max(S.alarmas.length, S.verif.length, S.lect.length);
+  while (S.alarmas.length < n) S.alarmas.push(vacioA());
+  while (S.verif.length < n) S.verif.push(vacioV());
+  while (S.lect.length < n) S.lect.push(vacioL());
+
+  const indices = Array.from({ length: n }, (_, i) => i);
+  indices.sort((iA, iB) => {
+    const compA = (S.alarmas[iA]?.comp || S.verif[iA]?.comp || S.lect[iA]?.comp || '').trim();
+    const compB = (S.alarmas[iB]?.comp || S.verif[iB]?.comp || S.lect[iB]?.comp || '').trim();
+    const vacioA = !compA, vacioB = !compB;
+    if (vacioA && !vacioB) return 1;
+    if (!vacioA && vacioB) return -1;
+    if (vacioA && vacioB) return iA - iB;
+    const pa = pesoOrdenGas(compA);
+    const pb = pesoOrdenGas(compB);
+    if (pa !== pb) return pa - pb;
+    return iA - iB;
+  });
+
+  const yaEnOrden = indices.every((val, idx) => val === idx);
+  if (yaEnOrden && !silencioso) {
+    avisar('Los componentes ya están en el orden correcto: 1) H2S, 2) CO, 3) CH4, 4) O2.', 'info');
+    return;
+  }
+
+  const antes = aplanar(recolectar());
+  S.alarmas = indices.map(idx => S.alarmas[idx]);
+  S.verif = indices.map(idx => S.verif[idx]);
+  S.lect = indices.map(idx => S.lect[idx]);
+  render();
+
+  const despues = aplanar(recolectar());
+  Object.keys(despues).forEach(ruta => {
+    if ((antes[ruta] ?? '') !== (despues[ruta] ?? '')) {
+      recordChange(ruta, antes[ruta] ?? '', despues[ruta] ?? '', true);
+    }
+  });
+
+  if (!silencioso) avisar('Componentes ordenados correctamente: 1) H2S, 2) CO, 3) CH4, 4) O2.');
+}
+
+function cargarGasesMultigas() {
+  const gases4 = ['H2S', 'CO', 'CH4', 'O2'];
+  while (S.alarmas.length < 4) S.alarmas.push(vacioA());
+  while (S.verif.length < 4) S.verif.push(vacioV());
+  while (S.lect.length < 4) S.lect.push(vacioL());
+  const antes = aplanar(recolectar());
+  gases4.forEach((c, i) => {
+    const preset = buscarPresetGas(c);
+    if (preset) {
+      S.alarmas[i] = { comp: preset.comp, uni: preset.uni, baja: preset.baja, alta: preset.alta, twa: preset.twa, stel: preset.stel };
+      S.verif[i].comp = preset.comp;
+      S.verif[i].uni = preset.uni;
+      S.lect[i].comp = preset.comp;
+    }
+  });
+  render();
+  const despues = aplanar(recolectar());
+  Object.keys(despues).forEach(ruta => {
+    if ((antes[ruta] ?? '') !== (despues[ruta] ?? '')) {
+      recordChange(ruta, antes[ruta] ?? '', despues[ruta] ?? '', true);
+    }
+  });
+  avisar('Cargados los 4 componentes en el orden oficial: 1) H2S, 2) CO, 3) CH4, 4) O2.');
+}
 
 function buscarPresetGas(rawComp, rawUni = '') {
   const c = String(rawComp || '').trim().toUpperCase().replace(/\s+/g, ' ');
@@ -1500,7 +1599,7 @@ async function traerRecepcion() {
     const antes = aplanar(recolectar());
     const set = (k, v) => { const e = $(`[data-k="${k}"]`); if (e && v) e.value = v; };
     set('cliente', r.cliente); set('marca', it.marca); set('modelo', it.modelo); set('serial', it.serial);
-    const comps = lista(it.componentes).filter(Boolean);
+    const comps = ordenarListaGases(lista(it.componentes).filter(Boolean));
     while (S.alarmas.length < comps.length) S.alarmas.push(vacioA());
     while (S.verif.length < comps.length) S.verif.push(vacioV());
     while (S.lect.length < comps.length) S.lect.push(vacioL());
